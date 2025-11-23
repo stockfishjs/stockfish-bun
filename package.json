@@ -1,0 +1,25 @@
+{
+  "name": "@stockfish/bun",
+  "version": "0.0.0",
+  "type": "module",
+  "author": "GameRoMan",
+  "license": "MIT",
+  "scripts": {
+    "build": "bunx --bun tsdown",
+    "test": "bun test",
+    "npm:publish": "bun publish --access public"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "bun": ">=1.3.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.3",
+    "tsdown": "^0.16.6",
+    "typescript": "^5.9.3"
+  }
+}
