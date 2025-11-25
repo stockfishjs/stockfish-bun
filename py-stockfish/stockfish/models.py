@@ -89,7 +89,7 @@ class Stockfish:
         self._path: str = path
         self._stockfish = subprocess.Popen(
             self._path,
-            universal_newlines=True,
+            text=True,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-setDefaultTimeout(16_000);
+setDefaultTimeout(7_000);
 
 process.env.STOCKFISH_PATH =
   "C:/Users/roman/AppData/Local/stockfish/stockfish.exe";
@@ -41,6 +41,7 @@ describe("Stockfish", () => {
     expect(engine.eval()).rejects.toThrow();
   });
 
+  // timeouts
   it("supports options", async () => {
     // not sure of a good way to test this that wouldn't be flaky
     const anotherEngine = new Stockfish(process.env.STOCKFISH_PATH, {
@@ -71,6 +72,7 @@ describe("Stockfish", () => {
 });
 
 describe("eval()", () => {
+  // timeouts
   it("considers the initial board to favor white", async () => {
     const evaluation = await engine.eval();
     console.log(evaluation);
@@ -128,6 +130,7 @@ describe("search()", () => {
 });
 
 describe("setoptions()", () => {
+  // timeouts
   it("runs", async () => {
     await engine.setoptions({
       "Debug Log File": "/dev/null",
@@ -142,13 +145,9 @@ describe("setoptions()", () => {
       "Minimum Thinking Time": 0,
       "Slow Mover": 10,
       nodestime: 16,
-      // eslint-disable-next-line @typescript-eslint/camelcase
       UCI_Chess960: false,
-      // eslint-disable-next-line @typescript-eslint/camelcase
       UCI_AnalyseMode: true,
-      // eslint-disable-next-line @typescript-eslint/camelcase
       UCI_LimitStrength: true,
-      // eslint-disable-next-line @typescript-eslint/camelcase
       UCI_Elo: 1450,
     });
     expect(true).toBe(true);

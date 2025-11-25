@@ -12,8 +12,9 @@ export const split = (text: string, delimeter: string | RegExp): string[] => {
 
 export const endAfterLabel = (label: string) => {
   return (text: string): boolean => {
-    console.log(label, Boolean(text.match(`${label}: .*\n`)));
-    return Boolean(text.match(`${label}: .*\n`));
+    const isMatch = Boolean(text.match(`${label}: .*${EOL}`));
+    console.log({ label, text, isMatch });
+    return isMatch;
   };
 };
 

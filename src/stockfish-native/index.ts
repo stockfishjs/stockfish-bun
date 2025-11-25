@@ -1,5 +1,6 @@
-import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EOL } from "node:os";
+
 import {
   split,
   endAfterLabel,
@@ -164,9 +165,9 @@ class Stockfish {
     if (searchmoves) {
       command += ` searchmoves ${searchmoves.join(" ")}`;
     }
-    Object.entries(basicOptions).forEach(
-      ([name, value]) => ` ${name} ${value}`
-    );
+    command += Object.entries(basicOptions)
+      .map(([name, value]) => ` ${name} ${value}`)
+      .join("");
     const response = await this.do(
       command,
       (response: string) => response.indexOf(`bestmove`) > -1
@@ -200,7 +201,7 @@ class Stockfish {
       ) {
         const [term, ...columns] = split(line, "|");
         for (const index in columns) {
-          const column = split(columns[index], /\s+/g).map((val) =>
+          const column = split(columns[index]!, /\s+/g).map((val) =>
             val === "----" ? null : parseFloat(val)
           );
           const l1 = headings[index];
@@ -243,7 +244,7 @@ class Stockfish {
 
   async board(): Promise<Board> {
     const rawResponse = await this.do(`d`, endAfterLabel("Checkers"));
-    const [board, data] = split(rawResponse, "\n\n");
+    const [board, data] = sections(rawResponse);
     const labeled = parseLabeled(data);
     const pieces = split(board, "\n")
       .filter((line) => line.indexOf(" ") > 0)
@@ -284,12 +285,11 @@ class Stockfish {
           resolve("");
           return true;
         }
-        
-
-        console.log({ command, result });
 
         // resolve when the completion check returns true
-        if (done(result)) {
+        const isDone = done(result);
+        console.log({ command, result, isDone });
+        if (isDone) {
           resolve(result.trim());
           return true;
         } else {
@@ -306,45 +306,44 @@ class Stockfish {
    * starts processing the queue (if it not currently running)
    */
   private advanceQueue(): void {
-    // can only run 1 command at a time
     if (this.running) {
       return;
     }
 
-    console.log({ queue: this.queue });
+    let current: QueueEntry | undefined;
+    while ((current = this.queue[0]) && current.immediate) {
+      this.queue.shift();
 
-    // operate FIFO
-    const current = this.queue.shift();
-
-    console.log({ current });
-
-    if (current !== null && current !== undefined) {
-      this.running = true;
-      if (!current.immediate) {
-        this.listener = (response: string): string => {
-          // pass the collected response to the callback
-          if (current.callback(response)) {
-            // true means the response was accepted as complete
-            // restart on the next entry
-            this.running = false;
-            this.advanceQueue();
-            // clear response
-            return "";
-          }
-          return response;
-        };
-      }
-
-      // send the uci string
       if (current.command) {
         this.engine.stdin.write(`${current.command}${EOL}`);
       }
 
-      // null indicates a command without a response
-      if (current.immediate) {
-        this.running = false;
-        current.callback("");
-        this.advanceQueue();
+      current.callback("");
+    }
+
+    const nextCommand = this.queue.shift();
+
+    if (nextCommand !== null && nextCommand !== undefined) {
+      this.running = true;
+      this.listener = (response: string): string => {
+        console.log({ nextCommand, response });
+
+        if (nextCommand.callback(response)) {
+          // true means the response was accepted as complete
+          // restart on the next entry
+          this.running = false;
+          this.listener = null; // Clear the listener
+          this.advanceQueue();
+
+          // clear response
+          return "";
+        }
+        return response;
+      };
+
+      // send the uci string
+      if (nextCommand.command) {
+        this.engine.stdin.write(`${nextCommand.command}${EOL}`);
       }
     }
   }
