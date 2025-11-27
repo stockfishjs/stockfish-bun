@@ -7,16 +7,15 @@ import { describe, it, expect } from "bun:test";
 import { Stockfish, StockfishError } from "~/py-stockfish";
 
 describe("Stockfish", () => {
-  //     @pytest.fixture
-  //     def stockfish(self) -> Stockfish:
-  //         return Stockfish()
-
-  //     def test_constructor_defaults(self):
-  //         sf = Stockfish()
-  //         assert sf is not None and sf._path == "stockfish"
-  //         assert sf._parameters == sf._DEFAULT_STOCKFISH_PARAMS
-  //         assert sf._depth == 15 and sf._num_nodes == 1000000
-  //         assert sf._turn_perspective is true
+  it("constructor defaults", () => {
+    const stockfish = new Stockfish();
+    expect(stockfish).toBeDefined();
+    expect(stockfish._path).toBe("stockfish");
+    expect(stockfish._parameters).toBe(stockfish._DEFAULT_STOCKFISH_PARAMS);
+    expect(stockfish._depth).toBe(15);
+    expect(stockfish._num_nodes).toBe(1000000);
+    expect(stockfish._turn_perspective).toBeTrue();
+  })
 
   it("constructor options", () => {
     const stockfish = new Stockfish({
@@ -28,7 +27,8 @@ describe("Stockfish", () => {
     expect(stockfish._depth).toBe(20);
     expect(stockfish._num_nodes).toBe(1000);
     expect(stockfish._turn_perspective).toBeFalse();
-    // assert sf._parameters["Threads"] == 2 and sf._parameters["UCI_Elo"] == 1500
+    expect(stockfish._parameters.Threads).toBe(2);
+    expect(stockfish._parameters.UCI_Elo).toBe(1500);
   });
 
   //     @pytest.mark.parametrize(

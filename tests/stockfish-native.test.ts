@@ -14,18 +14,7 @@ const E4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
 
 let engine: Stockfish;
 
-declare global {
-  namespace NodeJS {
-    interface ProcessEnv {
-      STOCKFISH_PATH: string;
-    }
-  }
-}
-
 setDefaultTimeout(7_000);
-
-process.env.STOCKFISH_PATH =
-  "C:/Users/roman/AppData/Local/stockfish/stockfish.exe";
 
 beforeEach(() => {
   engine = new Stockfish(process.env.STOCKFISH_PATH);

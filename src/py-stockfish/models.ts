@@ -10,20 +10,22 @@
 
 interface StockfishParameters {
   readonly "Debug Log File": string;
-  readonly Contempt: 0;
-  readonly "Min Split Depth": 0;
-  readonly Threads: 1;
-  readonly Ponder: false;
-  readonly Hash: 16;
-  readonly MultiPV: 1;
-  readonly "Skill Level": 20;
-  readonly "Move Overhead": 10;
-  readonly "Minimum Thinking Time": 20;
-  readonly "Slow Mover": 100;
-  readonly UCI_Chess960: false;
-  readonly UCI_LimitStrength: false;
-  readonly UCI_Elo: 1350;
+  readonly Contempt: number;
+  readonly "Min Split Depth": number;
+  readonly Threads: number;
+  readonly Ponder: boolean;
+  readonly Hash: number;
+  readonly MultiPV: number;
+  readonly "Skill Level": number;
+  readonly "Move Overhead": number;
+  readonly "Minimum Thinking Time": number;
+  readonly "Slow Mover": number;
+  readonly UCI_Chess960: boolean;
+  readonly UCI_LimitStrength: boolean;
+  readonly UCI_Elo: number;
 }
+
+type StockfishParametersKey = keyof StockfishParameters;
 
 type UCICommand = "uci" | (string & {});
 
@@ -106,7 +108,7 @@ export class Stockfish {
   private _path: string;
   private _has_quit_command_been_sent: boolean;
   private info: string;
-  private _parameters: {};
+  private _parameters: Partial<StockfishParameters>;
   private _stockfish: Bun.Subprocess<"pipe", "pipe", "pipe">;
 
   /**
@@ -117,21 +119,23 @@ export class Stockfish {
    * const stockfish = new Stockfish();
    * ```
    */
-  constructor({
-    path = "stockfish",
-    depth = 15,
-    parameters,
-    num_nodes = 1000000,
-    turn_perspective = true,
-    debug_view = false,
-  }: {
+  constructor(options?: {
     path?: string;
     depth?: number;
-    parameters?: StockfishParameters;
+    parameters?: Partial<StockfishParameters>;
     num_nodes?: number;
     turn_perspective?: boolean;
     debug_view?: boolean;
   }) {
+    const {
+      path = "stockfish",
+      depth = 15,
+      parameters,
+      num_nodes = 1000000,
+      turn_perspective = true,
+      debug_view = false,
+    } = { ...options };
+
     this._debug_view = debug_view;
     this._path = path;
     this._stockfish = Bun.spawn({
@@ -161,86 +165,75 @@ export class Stockfish {
     this._debug_view = activate;
   }
 
-  //      get_engine_parameters(this) -> dict[str, Any]:
-  //         """Returns the current engine parameters being used.
+  /**
+   * Returns the current engine parameters being used.
+   */
+  get_engine_parameters() {
+    return structuredClone(this._parameters);
+  }
 
-  //         Returns:
-  //             A deep copy of the dictionary storing the current engine parameters.
-  //         """
-  //         return copy.deepcopy(this._parameters)
+  /**
+   * "Updates the Stockfish engine parameters.
+   */
+  update_engine_parameters(parameters?: Partial<StockfishParameters>): void {
+    if (!parameters) return;
 
-  //      update_engine_parameters(parameters: dict[str, Any] | None): void
-  //         """Updates the Stockfish engine parameters.
+    const new_param_values = structuredClone(parameters);
 
-  //         Args:
-  //             parameters:
-  //                 Contains (key, value) pairs which will be used to update
-  //                 the Stockfish engine's current parameters.
+    //         for key in new_param_values:
+    //             if len(this._parameters) > 0 and key not in this._parameters:
+    //                 raise ValueError(f"'{key}' is not a key that exists.")
+    //             if key in ("Ponder", "UCI_Chess960", "UCI_LimitStrength") and not isinstance(
+    //                 new_param_values[key], bool
+    //             ):
+    //                 raise ValueError(
+    //                     f"The value for the '{key}' key has been updated from a string to a bool in a new release of the python stockfish package."
+    //                 )
+    //             this._validate_param_val(key, new_param_values[key])
 
-  //         Returns:
-  //             `None`
+    //         if ("Skill Level" in new_param_values) != (
+    //             "UCI_Elo" in new_param_values
+    //         ) and "UCI_LimitStrength" not in new_param_values:
+    //             # This means the user wants to update the Skill Level or UCI_Elo (only one,
+    //             # not both), and that they didn't specify a new value for UCI_LimitStrength.
+    //             # So, update UCI_LimitStrength, in case it's not the right value currently.
+    //             if "Skill Level" in new_param_values:
+    //                 new_param_values.update({"UCI_LimitStrength": false})
+    //             elif "UCI_Elo" in new_param_values:
+    //                 new_param_values.update({"UCI_LimitStrength": true})
 
-  //         Example:
-  //             >>> stockfish.update_engine_parameters({'Threads': 2})
-  //         """
-  //         if not parameters:
-  //             return
+    //         if "Threads" in new_param_values:
+    //             # Recommended to set the hash param after threads.
+    //             threads_value = new_param_values["Threads"]
+    //             del new_param_values["Threads"]
+    //             hash_value = None
+    //             if "Hash" in new_param_values:
+    //                 hash_value = new_param_values["Hash"]
+    //                 del new_param_values["Hash"]
+    //             else:
+    //                 hash_value = this._parameters["Hash"]
+    //             new_param_values["Threads"] = threads_value
+    //             new_param_values["Hash"] = hash_value
 
-  //         new_param_values = copy.deepcopy(parameters)
+    //         for name, value in new_param_values.items():
+    //             this._set_option(name, value)
+    //         this.set_fen_position(this.get_fen_position(), false)
+    //         # Getting SF to set the position again, since UCI option(s) have been updated.
 
-  //         for key in new_param_values:
-  //             if len(this._parameters) > 0 and key not in this._parameters:
-  //                 raise ValueError(f"'{key}' is not a key that exists.")
-  //             if key in ("Ponder", "UCI_Chess960", "UCI_LimitStrength") and not isinstance(
-  //                 new_param_values[key], bool
-  //             ):
-  //                 raise ValueError(
-  //                     f"The value for the '{key}' key has been updated from a string to a bool in a new release of the python stockfish package."
-  //                 )
-  //             this._validate_param_val(key, new_param_values[key])
+    //      reset_engine_parameters(this): void
+    //         """Resets the Stockfish engine parameters.
 
-  //         if ("Skill Level" in new_param_values) != (
-  //             "UCI_Elo" in new_param_values
-  //         ) and "UCI_LimitStrength" not in new_param_values:
-  //             # This means the user wants to update the Skill Level or UCI_Elo (only one,
-  //             # not both), and that they didn't specify a new value for UCI_LimitStrength.
-  //             # So, update UCI_LimitStrength, in case it's not the right value currently.
-  //             if "Skill Level" in new_param_values:
-  //                 new_param_values.update({"UCI_LimitStrength": false})
-  //             elif "UCI_Elo" in new_param_values:
-  //                 new_param_values.update({"UCI_LimitStrength": true})
+    //         Returns:
+    //             `None`
+    //         """
+    //         this.update_engine_parameters(this._DEFAULT_STOCKFISH_PARAMS)
 
-  //         if "Threads" in new_param_values:
-  //             # Recommended to set the hash param after threads.
-  //             threads_value = new_param_values["Threads"]
-  //             del new_param_values["Threads"]
-  //             hash_value = None
-  //             if "Hash" in new_param_values:
-  //                 hash_value = new_param_values["Hash"]
-  //                 del new_param_values["Hash"]
-  //             else:
-  //                 hash_value = this._parameters["Hash"]
-  //             new_param_values["Threads"] = threads_value
-  //             new_param_values["Hash"] = hash_value
-
-  //         for name, value in new_param_values.items():
-  //             this._set_option(name, value)
-  //         this.set_fen_position(this.get_fen_position(), false)
-  //         # Getting SF to set the position again, since UCI option(s) have been updated.
-
-  //      reset_engine_parameters(this): void
-  //         """Resets the Stockfish engine parameters.
-
-  //         Returns:
-  //             `None`
-  //         """
-  //         this.update_engine_parameters(this._DEFAULT_STOCKFISH_PARAMS)
-
-  //      _prepare_for_new_position(send_ucinewgame_token: boolean = true): void
-  //         if send_ucinewgame_token:
-  //             this._put("ucinewgame")
-  //         this._is_ready()
-  //         this.info = ""
+    //      _prepare_for_new_position(send_ucinewgame_token: boolean = true): void
+    //         if send_ucinewgame_token:
+    //             this._put("ucinewgame")
+    //         this._is_ready()
+    //         this.info = ""
+  }
 
   _put(command: UCICommand): void {
     if (!this._stockfish.stdin) {
@@ -261,18 +254,16 @@ export class Stockfish {
     }
   }
 
-  // _read_line() {
-  //   if (!this._stockfish.stdout) {
-  //     throw new BrokenPipeError();
-  //   }
-
-  //   if (this._stockfish.exitCode !== null) {
-  //     throw new StockfishError("The Stockfish process has crashed");
-  //   }
-
-  //   const line = this._stockfish.stdout.readline().strip();
-  //   return line
-  // }
+  _read_line(): string {
+    if (!this._stockfish.stdout) {
+      throw new BrokenPipeError();
+    }
+    if (this._stockfish.exitCode !== null) {
+      throw new StockfishError("The Stockfish process has crashed");
+    }
+    //   const line = this._stockfish.stdout.readline().strip();
+    //   return line
+  }
 
   //      _discard_remaining_stdout_lines(substr_in_last_line: string): void
   //         """Calls _read_line() until encountering `substr_in_last_line` in the line."""
@@ -325,7 +316,7 @@ export class Stockfish {
   //      _go_perft(depth: number): void
   //         this._put(f"go perft {depth}")
 
-  //      _on_weaker_setting(this) -> bool:
+  //      _on_weaker_setting():boolean
   //         return this._parameters["UCI_LimitStrength"] or this._parameters["Skill Level"] < 20
 
   //      _weaker_setting_warning(message: string): void
@@ -512,78 +503,55 @@ export class Stockfish {
   //         """
   //         this.update_engine_parameters({"UCI_LimitStrength": false, "Skill Level": 20})
 
-  //      set_depth(depth: number = 15): void
-  //         """Sets current depth of Stockfish engine.
+  /**
+   * Sets current depth of Stockfish engine.
+   */
+  set_depth(depth: number = 15): void {
+    if (depth < 1) {
+      throw new TypeError("depth must be an integer higher than 0");
+    }
+    this._depth = depth;
+  }
 
-  //         Args:
-  //             depth: Depth as integer 1 or higher
+  /**
+   * Returns configured depth to search
+   */
+  get_depth(): number {
+    return this._depth;
+  }
 
-  //         Returns:
-  //             `None`
+  /**
+   * Sets current number of nodes of Stockfish engine.
+   */
+  set_num_nodes(num_nodes: number = 1000000): void {
+    if (num_nodes < 1) {
+      throw new TypeError("num_nodes must be an integer higher than 0");
+    }
+    this._num_nodes = num_nodes;
+  }
 
-  //         Example:
-  //             >>> stockfish.set_depth(16)
-  //         """
-  //         if not isinstance(depth, int) or depth < 1 or isinstance(depth, bool):
-  //             raise TypeError("depth must be an integer higher than 0")
-  //         this._depth = depth
+  /**
+   * Returns configured number of nodes to search
+   */
+  get_num_nodes(): number {
+    return this._num_nodes;
+  }
 
-  //      get_depth(this) -> int:
-  //         """Returns configured depth to search
+  /**
+   * Sets perspective of centipawn and WDL evaluations.
+   *
+   * @param turn_perspective whether perspective is turn-based. Default `true`. If `false`, returned evaluations are from White's perspective.
+   */
+  set_turn_perspective(turn_perspective: boolean = true): void {
+    this._turn_perspective = turn_perspective;
+  }
 
-  //         Returns:
-  //             `Integer`
-  //         """
-  //         return this._depth
-
-  //      set_num_nodes(num_nodes: number = 1000000): void
-  //         """Sets current number of nodes of Stockfish engine.
-
-  //         Args:
-  //             num_nodes: Number of nodes for Stockfish to search.
-
-  //         Returns:
-  //             `None`
-
-  //         Example:
-  //             >>> stockfish.set_num_nodes(1000000)
-  //         """
-  //         if not isinstance(num_nodes, int) or isinstance(num_nodes, bool) or num_nodes < 1:
-  //             raise TypeError("num_nodes must be an integer higher than 0")
-  //         this._num_nodes: number = num_nodes
-
-  //      get_num_nodes(this) -> int:
-  //         """Returns configured number of nodes to search
-
-  //         Returns:
-  //             `Integer`
-  //         """
-  //         return this._num_nodes
-
-  //      set_turn_perspective(turn_perspective: boolean = true): void
-  //         """Sets perspective of centipawn and WDL evaluations.
-
-  //         Args:
-  //             turn_perspective:
-  //               Boolean whether perspective is turn-based. Default `true`.
-  //               If `false`, returned evaluations are from White's perspective.
-
-  //         Returns:
-  //             `None`
-
-  //         Example:
-  //             >>> stockfish.set_turn_perspective(false)
-  //         """
-  //         if not isinstance(turn_perspective, bool):
-  //             raise TypeError("turn_perspective must be a Boolean")
-  //         this._turn_perspective = turn_perspective
-
-  //      get_turn_perspective(this) -> bool:
-  //         """Returns whether centipawn and WDL values are set from turn perspective.
-  //         Returns:
-  //             `Boolean`
-  //         """
-  //         return this._turn_perspective
+  /**
+   * Returns whether centipawn and WDL values are set from turn perspective.
+   */
+  get_turn_perspective(): boolean {
+    return this._turn_perspective;
+  }
 
   //      get_best_move(wtime: number | None = None, btime: number | None = None) -> str | None:
   //         """Returns best move with current position on the board.
@@ -772,21 +740,22 @@ export class Stockfish {
   //             return (wdl_stats[0], wdl_stats[1], wdl_stats[2])
   //         return wdl_stats
 
-  //      does_current_engine_version_have_wdl_option(this) -> bool:
-  //         """Returns whether the user's version of Stockfish has the option
-  //            to display WDL stats.
-
-  //         Returns:
-  //             `true` if Stockfish has the `WDL` option, otherwise `false`.
-  //         """
-  //         this._put("uci")
-  //         while true:
-  //             splitted_text = this._read_line().split(" ")
-  //             if splitted_text[0] == "uciok":
-  //                 return false
-  //             elif "UCI_ShowWDL" in splitted_text:
-  //                 this._discard_remaining_stdout_lines("uciok")
-  //                 return true
+  /**
+   * Returns whether the user's version of Stockfish has the option to display WDL stats.
+   * @returns `true` if Stockfish has the `WDL` option, otherwise `false`.
+   */
+  does_current_engine_version_have_wdl_option(): boolean {
+    this._put("uci");
+    while (true) {
+      const splitted_text = this._read_line().split(" ");
+      if (splitted_text[0] == "uciok") {
+        return false;
+      } else if (splitted_text.includes("UCI_ShowWDL")) {
+        this._discard_remaining_stdout_lines("uciok");
+        return true;
+      }
+    }
+  }
 
   //      get_evaluation(searchtime: number | None = None) -> dict[str, str | int]:
   //         """Searches to the specified depth and evaluates the current position.
@@ -1114,7 +1083,7 @@ export class Stockfish {
   //         """Returns Stockfish engine build version."""
   //         return this._version["sha"]
 
-  //      is_development_build_of_engine(this) -> bool:
+  //      is_development_build_of_engine():boolean
   //         """Returns whether the version of Stockfish being used is a
   //            development build.
 
@@ -1136,6 +1105,7 @@ export class Stockfish {
       }
     }
   }
+
   //      _parse_stockfish_version(version_text: string = ""): void
   //         try:
   //             this._version: dict[str, Any] = {
