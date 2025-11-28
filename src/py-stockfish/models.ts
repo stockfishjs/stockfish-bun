@@ -111,6 +111,10 @@ export class Stockfish {
   private _parameters: Partial<StockfishParameters>;
   private _stockfish: Bun.Subprocess<"pipe", "pipe", "pipe">;
 
+  private _num_nodes: number;
+  private _depth: number;
+  private _turn_perspective: boolean;
+
   /**
    * Initializes the Stockfish engine.
    *
@@ -219,20 +223,21 @@ export class Stockfish {
     //             this._set_option(name, value)
     //         this.set_fen_position(this.get_fen_position(), false)
     //         # Getting SF to set the position again, since UCI option(s) have been updated.
+  }
 
-    //      reset_engine_parameters(this): void
-    //         """Resets the Stockfish engine parameters.
+  /**
+   * Resets the Stockfish engine parameters.
+   */
+  reset_engine_parameters(): void {
+    this.update_engine_parameters(this._DEFAULT_STOCKFISH_PARAMS);
+  }
 
-    //         Returns:
-    //             `None`
-    //         """
-    //         this.update_engine_parameters(this._DEFAULT_STOCKFISH_PARAMS)
-
-    //      _prepare_for_new_position(send_ucinewgame_token: boolean = true): void
-    //         if send_ucinewgame_token:
-    //             this._put("ucinewgame")
-    //         this._is_ready()
-    //         this.info = ""
+  _prepare_for_new_position(send_ucinewgame_token: boolean = true): void {
+    if (send_ucinewgame_token) {
+      this._put("ucinewgame");
+    }
+    this._is_ready();
+    this.info = "";
   }
 
   _put(command: UCICommand): void {
@@ -265,10 +270,12 @@ export class Stockfish {
     //   return line
   }
 
-  //      _discard_remaining_stdout_lines(substr_in_last_line: string): void
-  //         """Calls _read_line() until encountering `substr_in_last_line` in the line."""
-  //         while substr_in_last_line not in this._read_line():
-  //             pass
+  /**
+   * Calls `_read_line()` until encountering `substr_in_last_line` in the line.
+   */
+  _discard_remaining_stdout_lines(substr_in_last_line: string): void {
+    while (!this._read_line().includes(substr_in_last_line));
+  }
 
   //      _set_option(name: string, value: Any, update_parameters_attribute: boolean = true): void
   //         this._validate_param_val(name, value)
@@ -291,27 +298,33 @@ export class Stockfish {
   //         if maximum is not None and type(value) is int and value > maximum:
   //             raise ValueError(f"{value} is over {name}'s maximum value of {maximum}")
 
-  //      _is_ready(this): void
-  //         this._put("isready")
-  //         while this._read_line() != "readyok":
-  //             pass
+  _is_ready(): void {
+    this._put("isready");
+    while (this._read_line() != "readyok");
+  }
 
-  //      _go(this): void
-  //         this._put(f"go depth {this._depth}")
+  _go(): void {
+    this._put(`go depth ${this._depth}`);
+  }
 
-  //      _go_nodes(this): void
-  //         this._put(f"go nodes {this._num_nodes}")
+  _go_nodes(): void {
+    this._put(`go nodes ${this._num_nodes}`);
+  }
 
-  //      _go_time(time: number): void
-  //         this._put(f"go movetime {time}")
+  _go_time(time: number): void {
+    this._put(`go movetime ${time}`);
+  }
 
-  //      _go_remaining_time(wtime: number | None, btime: number | None): void
-  //         cmd = "go"
-  //         if wtime is not None:
-  //             cmd += f" wtime {wtime}"
-  //         if btime is not None:
-  //             cmd += f" btime {btime}"
-  //         this._put(cmd)
+  _go_remaining_time(wtime?: number, btime?: number): void {
+    let cmd = "go";
+    if (wtime !== undefined) {
+      cmd += ` wtime ${wtime}`;
+    }
+    if (btime !== undefined) {
+      cmd += ` btime ${btime}`;
+    }
+    this._put(cmd);
+  }
 
   //      _go_perft(depth: number): void
   //         this._put(f"go perft {depth}")
@@ -344,7 +357,7 @@ export class Stockfish {
   //         this._prepare_for_new_position(send_ucinewgame_token)
   //         this._put(f"position fen {fen_position}")
 
-  //      set_position(moves: list[str] | None = None): void
+  //      set_position(moves: string[] | None = None): void
   //         """Sets current board position.
 
   //         Args:
@@ -361,7 +374,7 @@ export class Stockfish {
   //         this.set_fen_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true)
   //         this.make_moves_from_current_position(moves)
 
-  //      make_moves_from_current_position(moves: list[str] | None): void
+  //      make_moves_from_current_position(moves: string[] | None): void
   //         """Sets a new position by playing the moves from the current position.
 
   //         Args:
@@ -383,7 +396,7 @@ export class Stockfish {
   //                 raise ValueError(f"Cannot make move: {move}")
   //             this._put(f"position fen {this.get_fen_position()} moves {move}")
 
-  //      get_board_visual(perspective_white: boolean = true) -> str:
+  //      get_board_visual(perspective_white: boolean = true): string
   //         """Returns a visual representation of the current board position.
 
   //         Args:
@@ -417,7 +430,7 @@ export class Stockfish {
   //             ```
   //         """
   //         this._put("d")
-  //         board_rep_lines: list[str] = []
+  //         board_rep_lines: string[] = []
   //         count_lines: number = 0
   //         while count_lines < 17:
   //             board_str: string = this._read_line()
@@ -447,7 +460,7 @@ export class Stockfish {
   //         board_rep = "\n".join(board_rep_lines) + "\n"
   //         return board_rep
 
-  //      get_fen_position(this) -> str:
+  //      get_fen_position(this): string
   //         """Returns current board position in Forsyth-Edwards notation (FEN).
 
   //         Returns:
@@ -553,65 +566,62 @@ export class Stockfish {
     return this._turn_perspective;
   }
 
-  //      get_best_move(wtime: number | None = None, btime: number | None = None) -> str | None:
-  //         """Returns best move with current position on the board.
-  //         `wtime` and `btime` arguments influence the search only if provided.
+  /**
+   * Returns best move with current position on the board.
+   * `wtime` and `btime` arguments influence the search only if provided.
+   *
+   * @param wtime Time for white player in milliseconds (int)
+   * @param btime Time for black player in milliseconds (int)
+   *
+   * @returns A string of move in algebraic notation, or `None` if it's a mate now.
+   */
+  get_best_move(wtime?: number, btime?: number) {
+    if (wtime !== undefined || btime !== undefined) {
+      this._go_remaining_time(wtime, btime);
+    } else {
+      this._go();
+    }
+    return this._get_best_move_from_sf_popen_process();
+  }
 
-  //         Args:
-  //             wtime:
-  //                 Time for white player in milliseconds (int)
-  //             btime:
-  //                 Time for black player in milliseconds (int)
+  /**
+   * Returns best move with current position on the board after a determined time
+   *
+   * @param time Time for Stockfish to determine best move in milliseconds (int)
+   *
+   * @returns A string of move in algebraic notation, or `None` if it's a mate now.
+   */
+  get_best_move_time(time: number = 1000) {
+    this._go_time(time);
+    return this._get_best_move_from_sf_popen_process();
+  }
 
-  //         Returns:
-  //             A string of move in algebraic notation, or `None` if it's a mate now.
+  /**
+   * Precondition - a "go" command must have been sent to SF before calling this function.
+   * This function needs existing output to read from the SF popen process.
+   */
+  _get_best_move_from_sf_popen_process() {
+    const lines: string[] = this._get_sf_go_command_output();
+    this.info = lines[-2];
+    const last_line_split = lines.at(-1).split(" ");
+    //         return None if last_line_split[1] == "(none)" else last_line_split[1]
+  }
 
-  //         Example:
-  //             >>> move = stockfish.get_best_move(wtime=1000, btime=1000)
-  //         """
-  //         if wtime is not None or btime is not None:
-  //             this._go_remaining_time(wtime, btime)
-  //         else:
-  //             this._go()
-  //         return this._get_best_move_from_sf_popen_process()
-
-  //      get_best_move_time(time: number = 1000) -> str | None:
-  //         """Returns best move with current position on the board after a determined time
-
-  //         Args:
-  //             time:
-  //               Time for Stockfish to determine best move in milliseconds (int)
-
-  //         Returns:
-  //             A string of move in algebraic notation, or `None` if it's a mate now.
-
-  //         Example:
-  //             >>> move = stockfish.get_best_move_time(1000)
-  //         """
-  //         this._go_time(time)
-  //         return this._get_best_move_from_sf_popen_process()
-
-  //      _get_best_move_from_sf_popen_process(this) -> str | None:
-  //         """Precondition - a "go" command must have been sent to SF before calling this function.
-  //         This function needs existing output to read from the SF popen process."""
-
-  //         lines: list[str] = this._get_sf_go_command_output()
-  //         this.info = lines[-2]
-  //         last_line_split = lines[-1].split(" ")
-  //         return None if last_line_split[1] == "(none)" else last_line_split[1]
-
-  //      _get_sf_go_command_output(this) -> list[str]:
-  //         """Precondition - a "go" command must have been sent to SF before calling this function.
-  //         This function needs existing output to read from the SF popen process.
-
-  //         A list of strings is returned, where each string represents a line of output."""
-
-  //         lines: list[str] = []
-  //         while true:
-  //             lines.append(this._read_line())
-  //             if lines[-1].startswith("bestmove"):
-  //                 # The "bestmove" line is the last line of the output.
-  //                 return lines
+  /**
+   * Precondition - a "go" command must have been sent to SF before calling this function.
+   * This function needs existing output to read from the SF popen process.
+   *
+   * A list of strings is returned, where each string represents a line of output.
+   */
+  _get_sf_go_command_output(): string[] {
+    const lines: string[] = [];
+    while (true) {
+      lines.push(this._read_line());
+      // if lines[-1].startswith("bestmove"):
+      //     // The "bestmove" line is the last line of the output.
+      //     return lines
+    }
+  }
 
   //     @staticmethod
   //      _is_fen_syntax_valid(fen: string) -> bool:
@@ -873,7 +883,7 @@ export class Stockfish {
   //             this._num_nodes = num_nodes
   //             this._go_nodes()
 
-  //         lines: list[list[str]] = [line.split(" ") for line in this._get_sf_go_command_output()]
+  //         lines: list[string[]] = [line.split(" ") for line in this._get_sf_go_command_output()]
 
   //         # Stockfish is now done evaluating the position,
   //         # and the output is stored in the list 'lines'
@@ -984,14 +994,17 @@ export class Stockfish {
 
   //         return num_nodes, move_possibilities
 
-  //      flip(this): void
-  //         """Flip the side to move"""
-  //         this._put("flip")
+  /**
+   * Flip the side to move
+   */
+  flip(): void {
+    this._put("flip");
+  }
 
-  //      _pick(line: list[str], value: string = "", index: number = 1) -> str:
-  //         return line[line.index(value) + index]
+  _pick(line: string[], value: string = "", index: number = 1): string {
+    return line[line.indexOf(value) + index];
+  }
 
-  //      get_what_is_on_square(square: string) -> "Stockfish.Piece | None":
   //         """Returns what is on the specified square.
 
   //         Args:
@@ -1005,6 +1018,7 @@ export class Stockfish {
   //         Example:
   //             >>> piece = stockfish.get_what_is_on_square("e2")
   //         """
+  //      get_what_is_on_square(square: string) -> "Stockfish.Piece | None":
 
   //         file_letter: string = square[0].lower()
   //         rank_num: number = int(square[1])
@@ -1075,11 +1089,11 @@ export class Stockfish {
   //         """Returns Stockfish engine minor version."""
   //         return this._version["minor"]
 
-  //      get_stockfish_patch_version(this) -> str:
+  //      get_stockfish_patch_version(this): string
   //         """Returns Stockfish engine patch version."""
   //         return this._version["patch"]
 
-  //      get_stockfish_sha_version(this) -> str:
+  //      get_stockfish_sha_version(this): string
   //         """Returns Stockfish engine build version."""
   //         return this._version["sha"]
 
@@ -1106,56 +1120,50 @@ export class Stockfish {
     }
   }
 
-  //      _parse_stockfish_version(version_text: string = ""): void
-  //         try:
-  //             this._version: dict[str, Any] = {
-  //                 "full": 0,
-  //                 "major": 0,
-  //                 "minor": 0,
-  //                 "patch": "",
-  //                 "sha": "",
-  //                 "is_dev_build": false,
-  //                 "text": version_text,
-  //             }
-
-  //             # check if version is a development build, eg. dev-20221219-61ea1534
-  //             if this._version["text"].startswith("dev-"):
-  //                 this._version["is_dev_build"] = true
-
-  //                 # parse patch and sha from dev version text
-  //                 this._version["patch"] = this._version["text"].split("-")[1]
-  //                 this._version["sha"] = this._version["text"].split("-")[2]
-
-  //                 # get major.minor version as text from build date
-  //                 build_date = this._version["text"].split("-")[1]
-  //                 date_string = (
-  //                     f"{int(build_date[:4])}-{int(build_date[4:6]):02d}-{int(build_date[6:8]):02d}"
-  //                 )
-  //                 this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
-
-  //             # check if version is a development build, eg. 280322
-  //             if len(this._version["text"]) == 6:
-  //                 this._version["is_dev_build"] = true
-
-  //                 # parse version number from DDMMYY
-  //                 this._version["patch"] = this._version["text"]
-
-  //                 # parse build date from dev version text
-  //                 build_date = this._version["text"]
-  //                 date_string = f"20{build_date[4:6]}-{build_date[2:4]}-{build_date[0:2]}"
-  //                 this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
-
-  //             # parse version number for all versions
-  //             this._version["major"] = int(this._version["text"].split(".")[0])
-  //             try:
-  //                 this._version["minor"] = int(this._version["text"].split(".")[1])
-  //             except IndexError:
-  //                 this._version["minor"] = 0
-  //             this._version["full"] = this._version["major"] + this._version["minor"] / 10
-  //         except Exception as e:
-  //             raise Exception(
-  //                 "Unable to parse Stockfish version. You may be using an unsupported version of Stockfish."
-  //             ) from e
+  _parse_stockfish_version(version_text: string = ""): void {
+    //         try:
+    //             this._version: dict[str, Any] = {
+    //                 "full": 0,
+    //                 "major": 0,
+    //                 "minor": 0,
+    //                 "patch": "",
+    //                 "sha": "",
+    //                 "is_dev_build": false,
+    //                 "text": version_text,
+    //             }
+    //             # check if version is a development build, eg. dev-20221219-61ea1534
+    //             if this._version["text"].startswith("dev-"):
+    //                 this._version["is_dev_build"] = true
+    //                 # parse patch and sha from dev version text
+    //                 this._version["patch"] = this._version["text"].split("-")[1]
+    //                 this._version["sha"] = this._version["text"].split("-")[2]
+    //                 # get major.minor version as text from build date
+    //                 build_date = this._version["text"].split("-")[1]
+    //                 date_string = (
+    //                     f"{int(build_date[:4])}-{int(build_date[4:6]):02d}-{int(build_date[6:8]):02d}"
+    //                 )
+    //                 this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
+    //             # check if version is a development build, eg. 280322
+    //             if len(this._version["text"]) == 6:
+    //                 this._version["is_dev_build"] = true
+    //                 # parse version number from DDMMYY
+    //                 this._version["patch"] = this._version["text"]
+    //                 # parse build date from dev version text
+    //                 build_date = this._version["text"]
+    //                 date_string = f"20{build_date[4:6]}-{build_date[2:4]}-{build_date[0:2]}"
+    //                 this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
+    //             # parse version number for all versions
+    //             this._version["major"] = int(this._version["text"].split(".")[0])
+    //             try:
+    //                 this._version["minor"] = int(this._version["text"].split(".")[1])
+    //             except IndexError:
+    //                 this._version["minor"] = 0
+    //             this._version["full"] = this._version["major"] + this._version["minor"] / 10
+    //         except Exception as e:
+    //             raise Exception(
+    //                 "Unable to parse Stockfish version. You may be using an unsupported version of Stockfish."
+    //             ) from e
+  }
 
   //      _get_stockfish_version_from_build_date(date_string: string = "") -> str | None:
   //         # Convert date string to datetime object
@@ -1240,7 +1248,7 @@ export class Stockfish {
   //                 this.evalType if this.evalType in ["mixed", "classical", "NNUE"] else "mixed"
   //             )
 
-  //      benchmark(params: BenchmarkParameters) -> str:
+  //      benchmark(params: BenchmarkParameters): string
   //         """Benchmark will run the bench command with BenchmarkParameters.
   //         It is an Additional custom non-UCI command, mainly for debugging.
   //         Do not use this command during a search!
