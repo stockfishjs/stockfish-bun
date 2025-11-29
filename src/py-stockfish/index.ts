@@ -1,1 +1,1 @@
-export { Stockfish, StockfishError } from "./models";
+export { Stockfish, Capture, Piece, StockfishError } from "./models";
