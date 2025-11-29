@@ -131,7 +131,7 @@ export class Stockfish {
     ["number", number, number] | ["string" | "boolean", null, null]
   >;
 
-  private readonly _DEFAULT_STOCKFISH_PARAMS = {
+  public static readonly DEFAULT_STOCKFISH_PARAMS = {
     "Debug Log File": "",
     Contempt: 0,
     "Min Split Depth": 0,
@@ -226,7 +226,7 @@ export class Stockfish {
     stockfish.info = "";
     stockfish._parameters = {};
     await stockfish.update_engine_parameters(
-      stockfish._DEFAULT_STOCKFISH_PARAMS
+      Stockfish.DEFAULT_STOCKFISH_PARAMS
     );
     await stockfish.update_engine_parameters(parameters);
     if (await stockfish.does_current_engine_version_have_wdl_option()) {
@@ -309,7 +309,7 @@ export class Stockfish {
    * Resets the Stockfish engine parameters.
    */
   async reset_engine_parameters(): Promise<void> {
-    await this.update_engine_parameters(this._DEFAULT_STOCKFISH_PARAMS);
+    await this.update_engine_parameters(Stockfish.DEFAULT_STOCKFISH_PARAMS);
   }
 
   private async _prepare_for_new_position(
@@ -396,15 +396,23 @@ export class Stockfish {
     await this._is_ready();
   }
 
-  _validate_param_val(name: StockfishParametersKey, value: unknown): void {
+  private _validate_param_val(
+    name: StockfishParametersKey,
+    value: unknown
+  ): void {
     if (!(name in Stockfish._PARAM_RESTRICTIONS)) {
       throw new Error("{name} is not a supported engine parameter");
     }
-    //         required_type, minimum, maximum = Stockfish._PARAM_RESTRICTIONS[name]
+
+    const [required_type, minimum, maximum] =
+      Stockfish._PARAM_RESTRICTIONS[name];
+
     //         if type(value) is not required_type:
     //             raise ValueError(f"{value} is not of type {required_type}")
+
     //         if minimum is not null and type(value) is int and value < minimum:
     //             raise ValueError(f"{value} is below {name}'s minimum value of {minimum}")
+
     //         if maximum is not null and type(value) is int and value > maximum:
     //             raise ValueError(f"{value} is over {name}'s maximum value of {maximum}")
   }
@@ -734,43 +742,43 @@ export class Stockfish {
   }
 
   private static _is_fen_syntax_valid(fen: string): boolean {
-    //         # Code for this function taken from: https://gist.github.com/Dani4kor/e1e8b439115878f8c6dcf127a4ed5d3e
-    //         # Some small changes have been made to the code.
-    //         if not re.match(
-    //             r"\s*^(((?:[rnbqkpRNBQKP1-8]+\/){7})[rnbqkpRNBQKP1-8]+)\s([b|w])\s(-|[K|Q|k|q]{1,4})\s(-|[a-h][1-8])\s(\d+\s\d+)$",
-    //             fen,
-    //         ):
-    //             return false
+    // # Code for this function taken from: https://gist.github.com/Dani4kor/e1e8b439115878f8c6dcf127a4ed5d3e
+    // # Some small changes have been made to the code.
+    // if not re.match(
+    //     r"\s*^(((?:[rnbqkpRNBQKP1-8]+\/){7})[rnbqkpRNBQKP1-8]+)\s([b|w])\s(-|[K|Q|k|q]{1,4})\s(-|[a-h][1-8])\s(\d+\s\d+)$",
+    //     fen,
+    // ):
+    //     return false
 
     const fen_fields = fen.split(/\s+/);
 
-    //         if any(
-    //             (
-    //                 len(fen_fields) != 6,
-    //                 len(fen_fields[0].split("/")) != 8,
-    //                 any(x not in fen_fields[0] for x in "Kk"),
-    //                 any(not fen_fields[x].isdigit() for x in (4, 5)),
-    //                 int(fen_fields[4]) >= int(fen_fields[5]) * 2,
-    //             )
-    //         ):
-    //             return false
+    // if any(
+    //     (
+    //         len(fen_fields) != 6,
+    //         len(fen_fields[0].split("/")) != 8,
+    //         any(x not in fen_fields[0] for x in "Kk"),
+    //         any(not fen_fields[x].isdigit() for x in (4, 5)),
+    //         int(fen_fields[4]) >= int(fen_fields[5]) * 2,
+    //     )
+    // ):
+    //     return false
 
-    //         for fenPart in fen_fields[0].split("/"):
-    //             field_sum: number = 0
-    //             previous_was_digit: boolean = false
-    //             for c in fenPart:
-    //                 if "1" <= c <= "8":
-    //                     if previous_was_digit:
-    //                         return false  # Two digits next to each other.
-    //                     field_sum += int(c)
-    //                     previous_was_digit = true
-    //                 elif c in Stockfish._PIECE_CHARS:
-    //                     field_sum += 1
-    //                     previous_was_digit = false
-    //                 else:
-    //                     return false  # Invalid character.
-    //             if field_sum != 8:
-    //                 return false  # One of the rows doesn't have 8 columns.
+    // for fenPart in fen_fields[0].split("/"):
+    //     field_sum: number = 0
+    //     previous_was_digit: boolean = false
+    //     for c in fenPart:
+    //         if "1" <= c <= "8":
+    //             if previous_was_digit:
+    //                 return false  # Two digits next to each other.
+    //             field_sum += int(c)
+    //             previous_was_digit = true
+    //         elif c in Stockfish._PIECE_CHARS:
+    //             field_sum += 1
+    //             previous_was_digit = false
+    //         else:
+    //             return false  # Invalid character.
+    //     if field_sum != 8:
+    //         return false  # One of the rows doesn't have 8 columns.
 
     return true;
   }
@@ -782,6 +790,7 @@ export class Stockfish {
     if (!Stockfish._is_fen_syntax_valid(fen)) {
       return false;
     }
+
     //         temp_sf: Stockfish = Stockfish(path=this._path, parameters={"Hash": 1})
     //         # Using a new temporary SF instance, in case the fen is an illegal position that causes
     //         # the SF process to crash.
@@ -844,11 +853,11 @@ export class Stockfish {
       return null;
     }
 
-    //         split_line = [line.split(" ") for line in lines if " multipv 1 " in line][-1]
-    //         wdl_index = split_line.index("wdl")
-    //         wdl_stats = [int(split_line[i]) for i in range(wdl_index + 1, wdl_index + 4)]
+    // split_line = [line.split(" ") for line in lines if " multipv 1 " in line][-1]
+    // wdl_index = split_line.index("wdl")
+    // wdl_stats = [int(split_line[i]) for i in range(wdl_index + 1, wdl_index + 4)]
 
-    //             return [wdl_stats[0], wdl_stats[1], wdl_stats[2]]
+    // return [wdl_stats[0], wdl_stats[1], wdl_stats[2]]
   }
 
   /**
@@ -910,157 +919,131 @@ export class Stockfish {
    * @returns A decimal representing the static eval, unless one side is in check or checkmated, in which case `null` is returned.
    */
   async get_static_eval(): Promise<number | null> {
-    //         // Stockfish gives the static eval from white's perspective:
-    //         compare: number = (
-    //             1 if not this.get_turn_perspective() or ("w" in this.get_fen_position()) else -1
-    //         )
+    // // Stockfish gives the static eval from white's perspective:
+    // compare: number = (
+    //     1 if not this.get_turn_perspective() or ("w" in this.get_fen_position()) else -1
+    // )
 
     this._put("eval");
 
     while (true) {
       const text = await this._read_line();
-      //             if any(text.startswith(x) for x in ("Final evaluation", "Total Evaluation")):
-      //                 static_eval = text.split()[2]
-      //                 if " none " not in text:
-      //                     this._read_line()
-      //                     # Consume the remaining line (for some reason `eval` outputs an extra newline)
-      //                 if static_eval == "none":
-      //                     assert "(in check)" in text
-      //                     return null
-      //                 else:
-      //                     return float(static_eval) * compare
+      // if any(text.startswith(x) for x in ("Final evaluation", "Total Evaluation")):
+      //     static_eval = text.split()[2]
+      //     if " none " not in text:
+      //         this._read_line()
+      //         # Consume the remaining line (for some reason `eval` outputs an extra newline)
+      //     if static_eval == "none":
+      //         assert "(in check)" in text
+      //         return null
+      //     else:
+      //         return float(static_eval) * compare
     }
   }
 
   /**
    * Returns info on the top moves in the position.
-
-  //         Args:
-  //             num_top_moves:
-  //               The number of moves for which to return information, assuming there
-  //               are at least that many legal moves.
-  //               Default is 5.
-
-  //             verbose:
-  //               Option to include the full info from the engine in the returned dictionary,
-  //               including seldepth, multipv, time, nodes, nps, and wdl if available.
-  //               `Boolean`. Default is `false`.
-
-  //             num_nodes:
-  //               Option to search until a certain number of nodes have been searched, instead of depth.
-  //               Default is 0.
-
-  //         Returns:
-  //             A list of dictionaries, where each dictionary contains keys for `Move`, `Centipawn`, and `Mate`.
-  //             The corresponding value for either the `Centipawn` or `Mate` key will be `null`.
-  //             If there are no moves in the position, an empty list is returned.
-
-  //             If `verbose` is `true`, the dictionary will also include the following keys: `SelectiveDepth`, `Time`,
-  //             `Nodes`, `NodesPerSecond`, `MultiPVLine`, and `WDL` (if available).
-
-  //         Example:
-  //             >>> moves = stockfish.get_top_moves(2, num_nodes=1000000, verbose=true)
-  */
-  //      get_top_moves(
-  //         num_top_moves: number = 5, verbose: boolean = false, num_nodes: number = 0
-  //     ) -> list[dict[str, Any]]:
-
-  //         if num_top_moves <= 0:
-  //             raise ValueError("num_top_moves is not a positive number.")
-  //         if this._on_weaker_setting():
-  //             this._weaker_setting_warning(
-  //                 + """ get_top_moves will still return the top moves of full strength Stockfish."""
-  //             )
-
-  //         # remember global values
-  //         old_multipv: number = this._parameters["MultiPV"]
-  //         old_num_nodes: number = this._num_nodes
-
-  //         # to get number of top moves, we use Stockfish's MultiPV option (i.e., multiple principal variations).
-  //         # set MultiPV to num_top_moves requested
-  //         if num_top_moves != this._parameters["MultiPV"]:
-  //             this._set_option("MultiPV", num_top_moves)
-
-  //         # start engine. will go until reaches this._depth or this._num_nodes
-  //         if num_nodes == 0:
-  //             this._go()
-  //         else:
-  //             this._num_nodes = num_nodes
-  //             this._go_nodes()
-
-  //         lines: list[string[]] = [line.split(" ") for line in this._get_sf_go_command_output()]
-
-  //         # Stockfish is now done evaluating the position,
-  //         # and the output is stored in the list 'lines'
-  //         top_moves: list[dict[str, str | int | null]] = []
-
-  //         # Set perspective of evaluations. If get_turn_perspective() is true, or white to move,
-  //         # use Stockfish's values -- otherwise, invert values.
-  //         perspective: number = (
-  //             1 if this.get_turn_perspective() or ("w" in this.get_fen_position()) else -1
-  //         )
-
-  //         # loop through Stockfish output lines in reverse order
-  //         for line in reversed(lines):
-  //             # If the line is a "bestmove" line, and the best move is "(none)", then
-  //             # there are no top moves, and we're done. Otherwise, continue with the next line.
-  //             if line[0] == "bestmove":
-  //                 if line[1] == "(none)":
-  //                     top_moves = []
-  //                     break
-  //                 continue
-
-  //             # if the line has no relevant info, we're done
-  //             if ("multipv" not in line) or ("depth" not in line):
-  //                 break
-
-  //             # if we're searching depth and the line is not our desired depth, we're done
-  //             if (num_nodes == 0) and (int(this._pick(line, "depth")) != this._depth):
-  //                 break
-
-  //             # if we're searching nodes and the line has less than desired number of nodes, we're done
-  //             if (num_nodes > 0) and (int(this._pick(line, "nodes")) < this._num_nodes):
-  //                 break
-
-  //             move_evaluation: dict[str, str | int | null] = {
-  //                 # get move
-  //                 "Move": this._pick(line, "pv"),
-  //                 # get cp if available
-  //                 "Centipawn": (int(this._pick(line, "cp")) * perspective if "cp" in line else null),
-  //                 # get mate if available
-  //                 "Mate": (int(this._pick(line, "mate")) * perspective if "mate" in line else null),
-  //             }
-
-  //             # add more info if verbose
-  //             if verbose:
-  //                 move_evaluation["Time"] = this._pick(line, "time")
-  //                 move_evaluation["Nodes"] = this._pick(line, "nodes")
-  //                 move_evaluation["MultiPVLine"] = this._pick(line, "multipv")
-  //                 move_evaluation["NodesPerSecond"] = this._pick(line, "nps")
-  //                 move_evaluation["SelectiveDepth"] = this._pick(line, "seldepth")
-
-  //                 # add wdl if available
-  //                 if this.does_current_engine_version_have_wdl_option():
-  //                     move_evaluation["WDL"] = " ".join(
-  //                         [
-  //                             this._pick(line, "wdl", 1),
-  //                             this._pick(line, "wdl", 2),
-  //                             this._pick(line, "wdl", 3),
-  //                         ][::perspective]
-  //                     )
-
-  //             # add move to list of top moves
-  //             top_moves.insert(0, move_evaluation)
-
-  //         # reset MultiPV to global value
-  //         if old_multipv != this._parameters["MultiPV"]:
-  //             this._set_option("MultiPV", old_multipv)
-
-  //         # reset this._num_nodes to global value
-  //         if old_num_nodes != this._num_nodes:
-  //             this._num_nodes = old_num_nodes
-
-  //         return top_moves
+   *
+   * @param num_top_moves The number of moves for which to return information, assuming there are at least that many legal moves. Default is 5.
+   *
+   * @param verbose Option to include the full info from the engine in the returned dictionary,
+   *                including `seldepth`, `multipv`, `time`, `nodes`, `nps`, and `wdl` if available. Default is `false`.
+   *
+   * @param num_nodes Option to search until a certain number of nodes have been searched, instead of depth. Default is 0.
+   *
+   * Returns:
+   *               A list of dictionaries, where each dictionary contains keys for `Move`, `Centipawn`, and `Mate`.
+   *               The corresponding value for either the `Centipawn` or `Mate` key will be `null`.
+   *               If there are no moves in the position, an empty list is returned.
+   *
+   *               If `verbose` is `true`, the dictionary will also include the following keys: `SelectiveDepth`, `Time`,
+   *               `Nodes`, `NodesPerSecond`, `MultiPVLine`, and `WDL` (if available).
+   */
+  get_top_moves(
+    num_top_moves: number = 5,
+    verbose: boolean = false,
+    num_nodes: number = 0
+  ) {
+    // if num_top_moves <= 0:
+    //     raise ValueError("num_top_moves is not a positive number.")
+    // if this._on_weaker_setting():
+    //     this._weaker_setting_warning(
+    //         + """ get_top_moves will still return the top moves of full strength Stockfish."""
+    //     )
+    // # remember global values
+    // old_multipv: number = this._parameters["MultiPV"]
+    // old_num_nodes: number = this._num_nodes
+    // # to get number of top moves, we use Stockfish's MultiPV option (i.e., multiple principal variations).
+    // # set MultiPV to num_top_moves requested
+    // if num_top_moves != this._parameters["MultiPV"]:
+    //     this._set_option("MultiPV", num_top_moves)
+    // # start engine. will go until reaches this._depth or this._num_nodes
+    // if num_nodes == 0:
+    //     this._go()
+    // else:
+    //     this._num_nodes = num_nodes
+    //     this._go_nodes()
+    // lines: list[string[]] = [line.split(" ") for line in this._get_sf_go_command_output()]
+    // # Stockfish is now done evaluating the position,
+    // # and the output is stored in the list 'lines'
+    // top_moves: list[dict[str, str | int | null]] = []
+    // # Set perspective of evaluations. If get_turn_perspective() is true, or white to move,
+    // # use Stockfish's values -- otherwise, invert values.
+    // perspective: number = (
+    //     1 if this.get_turn_perspective() or ("w" in this.get_fen_position()) else -1
+    // )
+    // # loop through Stockfish output lines in reverse order
+    // for line in reversed(lines):
+    //     # If the line is a "bestmove" line, and the best move is "(none)", then
+    //     # there are no top moves, and we're done. Otherwise, continue with the next line.
+    //     if line[0] == "bestmove":
+    //         if line[1] == "(none)":
+    //             top_moves = []
+    //             break
+    //         continue
+    //     # if the line has no relevant info, we're done
+    //     if ("multipv" not in line) or ("depth" not in line):
+    //         break
+    //     # if we're searching depth and the line is not our desired depth, we're done
+    //     if (num_nodes == 0) and (int(this._pick(line, "depth")) != this._depth):
+    //         break
+    //     # if we're searching nodes and the line has less than desired number of nodes, we're done
+    //     if (num_nodes > 0) and (int(this._pick(line, "nodes")) < this._num_nodes):
+    //         break
+    //     move_evaluation: dict[str, str | int | null] = {
+    //         # get move
+    //         "Move": this._pick(line, "pv"),
+    //         # get cp if available
+    //         "Centipawn": (int(this._pick(line, "cp")) * perspective if "cp" in line else null),
+    //         # get mate if available
+    //         "Mate": (int(this._pick(line, "mate")) * perspective if "mate" in line else null),
+    //     }
+    //     # add more info if verbose
+    //     if verbose:
+    //         move_evaluation["Time"] = this._pick(line, "time")
+    //         move_evaluation["Nodes"] = this._pick(line, "nodes")
+    //         move_evaluation["MultiPVLine"] = this._pick(line, "multipv")
+    //         move_evaluation["NodesPerSecond"] = this._pick(line, "nps")
+    //         move_evaluation["SelectiveDepth"] = this._pick(line, "seldepth")
+    //         # add wdl if available
+    //         if this.does_current_engine_version_have_wdl_option():
+    //             move_evaluation["WDL"] = " ".join(
+    //                 [
+    //                     this._pick(line, "wdl", 1),
+    //                     this._pick(line, "wdl", 2),
+    //                     this._pick(line, "wdl", 3),
+    //                 ][::perspective]
+    //             )
+    //     # add move to list of top moves
+    //     top_moves.insert(0, move_evaluation)
+    // # reset MultiPV to global value
+    // if old_multipv != this._parameters["MultiPV"]:
+    //     this._set_option("MultiPV", old_multipv)
+    // # reset this._num_nodes to global value
+    // if old_num_nodes != this._num_nodes:
+    //     this._num_nodes = old_num_nodes
+    // return top_moves
+  }
 
   /**
    * Returns perft information of the current position for a given depth
@@ -1068,25 +1051,25 @@ export class Stockfish {
    * @param depth The search depth given as an integer (1 or higher)
    */
   async get_perft(depth: number) {
-    //         if not isinstance(depth, int) or depth < 1 or isinstance(depth, bool):
-    //             raise TypeError("depth must be an integer higher than 0")
+    // if not isinstance(depth, int) or depth < 1 or isinstance(depth, bool):
+    //     raise TypeError("depth must be an integer higher than 0")
 
     this._go_perft(depth);
 
-    //         move_possibilities: dict[str, int] = {}
-    //         num_nodes = 0
-    //         while true:
-    //             line = this._read_line()
-    //             if line == "":
-    //                 continue
-    //             if "searched" in line:
-    //                 num_nodes = int(line.split(":")[1])
-    //                 break
-    //             move, num = line.split(":")
-    //             assert move not in move_possibilities
-    //             move_possibilities[move] = int(num)
-    //         this._read_line()  # Consumes the remaining newline stockfish outputs.
-    //         return num_nodes, move_possibilities
+    // move_possibilities: dict[str, int] = {}
+    // num_nodes = 0
+    // while true:
+    //     line = this._read_line()
+    //     if line == "":
+    //         continue
+    //     if "searched" in line:
+    //         num_nodes = int(line.split(":")[1])
+    //         break
+    //     move, num = line.split(":")
+    //     assert move not in move_possibilities
+    //     move_possibilities[move] = int(num)
+    // this._read_line()  # Consumes the remaining newline stockfish outputs.
+    // return num_nodes, move_possibilities
   }
 
   /**
@@ -1158,15 +1141,16 @@ export class Stockfish {
       if (!this._parameters["UCI_Chess960"]) {
         return Capture.DIRECT_CAPTURE;
       } else {
-        //                 # Check for Chess960 castling:
-        //                 castling_pieces = [
-        //                     [Piece.WHITE_KING, Piece.WHITE_ROOK],
-        //                     [Piece.BLACK_KING, Piece.BLACK_ROOK],
-        //                 ]
-        //                 if [starting_square_piece, ending_square_piece] in castling_pieces:
-        //                     return Capture.NO_CAPTURE
-        //                 else:
-        //                     return Capture.DIRECT_CAPTURE
+        // Check for Chess960 castling:
+        const castling_pieces = [
+          [Piece.WHITE_KING, Piece.WHITE_ROOK],
+          [Piece.BLACK_KING, Piece.BLACK_ROOK],
+        ];
+
+        // if [starting_square_piece, ending_square_piece] in castling_pieces:
+        //     return Capture.NO_CAPTURE
+        // else:
+        //     return Capture.DIRECT_CAPTURE
       }
     } else if (
       move_value.slice(2, 4) ===
@@ -1249,35 +1233,35 @@ export class Stockfish {
       };
       // check if version is a development build, eg. dev-20221219-61ea1534
       if (this._version.text.startsWith("dev-")) {
-        //                 this._version["is_dev_build"] = true
-        //                 // parse patch and sha from dev version text
-        //                 this._version["patch"] = this._version["text"].split("-")[1]
-        //                 this._version["sha"] = this._version["text"].split("-")[2]
-        //                 // get major.minor version as text from build date
-        //                 build_date = this._version["text"].split("-")[1]
-        //                 date_string = (
-        //                     f"{int(build_date[:4])}-{int(build_date[4:6]):02d}-{int(build_date[6:8]):02d}"
-        //                 )
-        //                 this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
+        this._version.is_dev_build = true;
+        // parse patch and sha from dev version text
+        this._version.patch = this._version.text.split("-")[1];
+        this._version.sha = this._version.text.split("-")[2];
+        // get major.minor version as text from build date
+        const build_date = this._version["text"].split("-")[1];
+        // date_string = (
+        //     f"{int(build_date[:4])}-{int(build_date[4:6]):02d}-{int(build_date[6:8]):02d}"
+        // )
+        // this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
       }
 
-      //             // check if version is a development build, eg. 280322
-      //             if len(this._version["text"]) == 6:
-      //                 this._version["is_dev_build"] = true
-      //                 // parse version number from DDMMYY
-      //                 this._version["patch"] = this._version["text"]
-      //                 // parse build date from dev version text
-      //                 build_date = this._version["text"]
-      //                 date_string = f"20{build_date[4:6]}-{build_date[2:4]}-{build_date[0:2]}"
-      //                 this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
+      // // check if version is a development build, eg. 280322
+      // if len(this._version["text"]) == 6:
+      //     this._version["is_dev_build"] = true
+      //     // parse version number from DDMMYY
+      //     this._version["patch"] = this._version["text"]
+      //     // parse build date from dev version text
+      //     build_date = this._version["text"]
+      //     date_string = f"20{build_date[4:6]}-{build_date[2:4]}-{build_date[0:2]}"
+      //     this._version["text"] = this._get_stockfish_version_from_build_date(date_string)
 
-      //             // parse version number for all versions
-      //             this._version.major = int(this._version["text"].split(".")[0])
-      //             try:
-      //                 this._version.minor = int(this._version["text"].split(".")[1])
-      //             except IndexError:
-      //                 this._version.minor = 0
-      //             this._version.full = this._version.major + this._version.minor / 10
+      // // parse version number for all versions
+      // this._version.major = int(this._version["text"].split(".")[0])
+      // try:
+      //     this._version.minor = int(this._version["text"].split(".")[1])
+      // except IndexError:
+      //     this._version.minor = 0
+      // this._version.full = this._version.major + this._version.minor / 10
     } catch (e) {
       throw new Error(
         "Unable to parse Stockfish version. You may be using an unsupported version of Stockfish.",
@@ -1290,24 +1274,28 @@ export class Stockfish {
     // Convert date string to datetime object
     const date_object = new Date(date_string);
     // Convert release date strings to datetime objects
-    //         releases_datetime = {
-    //             key: new Date(value)
-    //             for key, value in this._RELEASES.items()
-    //         }
+    const releases_datetime = Object.fromEntries(
+      Object.entries(this._RELEASES).map(([key, value]) => [
+        key,
+        new Date(value),
+      ])
+    );
 
-    //         // Find the key for the given date
-    //         key_for_date = null
-    //         for key, value in releases_datetime.items():
-    //             if value <= date_object:
-    //                 if key_for_date is null or value > releases_datetime[key_for_date]:
-    //                     key_for_date = key
+    // Find the key for the given date
+    let key_for_date = null;
+    for (const [key, value] in Object.entries(releases_datetime)) {
+      // if value <= date_object:
+      //     if key_for_date is null or value > releases_datetime[key_for_date]:
+      //         key_for_date = key
+    }
 
-    //         if key_for_date is null:
-    //             raise Exception(
-    //                 "There was a problem with finding the release associated with the engine publish date."
-    //             )
+    if (key_for_date === null) {
+      throw new Error(
+        "There was a problem with finding the release associated with the engine publish date."
+      );
+    }
 
-    //         return key_for_date
+    return key_for_date;
   }
 
   /**
