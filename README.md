@@ -8,8 +8,8 @@ Stockfish 17.0 and 17.1
 
 ### Partial support
 
-Stockfish >= 12.0
+Stockfish >= 15.0
 
 ### No support
 
-Stockfish < 12.0
+Stockfish < 15.0

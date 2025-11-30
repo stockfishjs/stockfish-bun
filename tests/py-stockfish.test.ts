@@ -233,7 +233,7 @@ describe("Stockfish", () => {
     // //     )
 
     // //     def test_last_info(self, stockfish: Stockfish, value):
-    // //         stockfish.set_fen_position("r6k/6b1/2b1Q3/p6p/1p5q/3P2PP/5r1K/8 w - - 1 31")
+    // //       await stockfish.set_fen_position("r6k/6b1/2b1Q3/p6p/1p5q/3P2PP/5r1K/8 w - - 1 31")
     // //         stockfish.get_best_move()
     // expect(stockfish.info).toContain(value);
   });
@@ -313,12 +313,14 @@ describe("Stockfish", () => {
 
   it("test_resume_full_strength", async () => {
     const stockfish = await getDefaultStockfish();
-    // //         stockfish.set_fen_position("1r1qrbk1/2pb1pp1/p4n1p/P3P3/3P4/NB4BP/6P1/R2QR1K1 b - - 0 1")
-    // //         stockfish.set_depth(13)
-    // //         stockfish.set_elo_rating(1350)
-    // expect(stockfish._on_weaker_setting())
-    // //         best_moves = ["d7c6", "d7f5"]
-    // //         low_elo_moves = [stockfish.get_best_move() for _ in range(15)]
+    await stockfish.set_fen_position(
+      "1r1qrbk1/2pb1pp1/p4n1p/P3P3/3P4/NB4BP/6P1/R2QR1K1 b - - 0 1"
+    );
+    stockfish.set_depth(13);
+    await stockfish.set_elo_rating(1350);
+    expect(stockfish._on_weaker_setting());
+    const best_moves = ["d7c6", "d7f5"] as const;
+    // low_elo_moves = [stockfish.get_best_move() for _ in range(15)]
     // expect(not all(x in best_moves for x in low_elo_moves)
     // //         stockfish.set_skill_level(1)
     // expect(stockfish._on_weaker_setting()
@@ -332,44 +334,44 @@ describe("Stockfish", () => {
 
   it("test_specific_params", async () => {
     const stockfish = await getDefaultStockfish();
-    //         old_parameters = {
-    //             "Debug Log File": "",
-    //             "Contempt": 0,
-    //             "Min Split Depth": 0,
-    //             "Threads": 1,
-    //             "Ponder": false,
-    //             "Hash": 16,
-    //             "MultiPV": 1,
-    //             "Skill Level": 20,
-    //             "Move Overhead": 10,
-    //             "Minimum Thinking Time": 20,
-    //             "Slow Mover": 100,
-    //             "UCI_Chess960": false,
-    //             "UCI_LimitStrength": false,
-    //             "UCI_Elo": 1350,
-    //         }
-    //         expected_parameters = old_parameters.copy()
-    //         stockfish.set_skill_level(1)
-    //         expected_parameters["Skill Level"] = 1
+    const old_parameters = {
+      "Debug Log File": "",
+      Contempt: 0,
+      "Min Split Depth": 0,
+      Threads: 1,
+      Ponder: false,
+      Hash: 16,
+      MultiPV: 1,
+      "Skill Level": 20,
+      "Move Overhead": 10,
+      "Minimum Thinking Time": 20,
+      "Slow Mover": 100,
+      UCI_Chess960: false,
+      UCI_LimitStrength: false,
+      UCI_Elo: 1350,
+    };
+    const expected_parameters = structuredClone(old_parameters);
+    await stockfish.set_skill_level(1);
+    expected_parameters["Skill Level"] = 1;
     expect(stockfish.get_engine_parameters()).toBe(expected_parameters);
-    expect(Stockfish.DEFAULT_STOCKFISH_PARAMS).toBe(old_parameters);
-    //         stockfish.set_skill_level(20)
-    //         expected_parameters["Skill Level"] = 20
+    expect(Stockfish.DEFAULT_STOCKFISH_PARAMS).toBe<unknown>(old_parameters);
+    await stockfish.set_skill_level(20);
+    expected_parameters["Skill Level"] = 20;
     expect(stockfish.get_engine_parameters()).toBe(old_parameters);
-    expect(Stockfish.DEFAULT_STOCKFISH_PARAMS).toBe(old_parameters);
-    //         stockfish.update_engine_parameters({"Threads": 4})
-    //         expected_parameters["Threads"] = 4
+    expect(Stockfish.DEFAULT_STOCKFISH_PARAMS).toBe<unknown>(old_parameters);
+    await stockfish.update_engine_parameters({ Threads: 4 });
+    expected_parameters.Threads = 4;
     expect(stockfish.get_engine_parameters()).toBe(expected_parameters);
-    //         stockfish.update_engine_parameters({"Hash": 128})
-    //         expected_parameters["Hash"] = 128
+    await stockfish.update_engine_parameters({ Hash: 128 });
+    expected_parameters.Hash = 128;
     expect(stockfish.get_engine_parameters()).toBe(expected_parameters);
-    //         stockfish.update_engine_parameters({"Hash": 256, "Threads": 3})
-    //         expected_parameters.update({"Hash": 256, "Threads": 3})
+    await stockfish.update_engine_parameters({ Hash: 256, Threads: 3 });
+    Object.assign(expected_parameters, { Hash: 256, Threads: 3 });
     expect(stockfish.get_engine_parameters()).toBe(expected_parameters);
   });
 
   it("test_update_engine_parameters_wrong_vals", async () => {
-    // //     def test_update_engine_parameters_wrong_vals(self, stockfish: Stockfish):
+    const stockfish = await getDefaultStockfish();
     // expect(set(stockfish.get_engine_parameters().keys()) <= set(
     // //             Stockfish._PARAM_RESTRICTIONS.keys()
     // //         )
@@ -387,33 +389,33 @@ describe("Stockfish", () => {
     // //                 with pytest.raises(ValueError):
     // //                     stockfish.update_engine_parameters({name: val})
     // //                 with pytest.raises(ValueError):
-    // //                     stockfish._set_option(name, val)
+    // //                 await  stockfish._set_option(name, val)
   });
 
   it("test_chess960_position", async () => {
     const stockfish = await getDefaultStockfish();
-    // expect("KQkq" in stockfish.get_fen_position()
-    // //         old_parameters = stockfish.get_engine_parameters()
-    // //         expected_parameters = stockfish.get_engine_parameters()
-    // //         expected_parameters["UCI_Chess960"] = true
-    // //         stockfish.update_engine_parameters({"UCI_Chess960": true})
-    // expect("HAha" in stockfish.get_fen_position()
-    // expect(stockfish.get_engine_parameters()).toBe(expected_parameters
-    // //         stockfish.set_fen_position("4rkr1/4p1p1/8/8/8/8/8/4nK1R w K - 0 100")
+    expect(await stockfish.get_fen_position()).toContain("KQkq");
+    const old_parameters = stockfish.get_engine_parameters();
+    const expected_parameters = stockfish.get_engine_parameters();
+    expected_parameters.UCI_Chess960 = true;
+    await stockfish.update_engine_parameters({ UCI_Chess960: true });
+    expect(await stockfish.get_fen_position()).toContain("HAha");
+    expect(stockfish.get_engine_parameters()).toEqual(expected_parameters);
+    await stockfish.set_fen_position("4rkr1/4p1p1/8/8/8/8/8/4nK1R w K - 0 100");
     // expect(await stockfish.get_best_move()).toBe("f1h1"
-    // //         stockfish.set_turn_perspective(false)
-    // expect(stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
-    // //         stockfish.set_turn_perspective()
-    // expect(stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
+    stockfish.set_turn_perspective(false);
+    // expect(await stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
+    stockfish.set_turn_perspective(true);
+    // expect(await stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
     // expect(stockfish.will_move_be_a_capture("f1h1") is Stockfish.Capture.NO_CAPTURE
     // expect(stockfish.will_move_be_a_capture("f1e1") is Stockfish.Capture.DIRECT_CAPTURE
     // //         stockfish.update_engine_parameters({"UCI_Chess960": false})
     // expect(stockfish.get_engine_parameters()).toBe(old_parameters
     // expect(await stockfish.get_best_move()).toBe("f1g1"
     // //         stockfish.set_turn_perspective(false)
-    // expect(stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
-    // //         stockfish.set_turn_perspective()
-    // expect(stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
+    // expect(await stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
+    // //         stockfish.set_turn_perspective(true)
+    // expect(await stockfish.get_evaluation()).toBe({"type": "mate", "value": 2}
     // expect(stockfish.will_move_be_a_capture("f1g1") is Stockfish.Capture.NO_CAPTURE
   });
 
@@ -525,7 +527,10 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "1nb1k1n1/pppppppp/8/6r1/5bqK/6r1/8/8 w - - 2 2"
     );
-    expect(await stockfish.get_evaluation()).toBe({ type: "mate", value: 0 });
+    expect(await stockfish.get_evaluation()).toEqual({
+      type: "mate",
+      value: 0,
+    });
   });
 
   it("test_get_evaluation_stalemate", async () => {
@@ -533,28 +538,28 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "1nb1kqn1/pppppppp/8/6r1/5b1K/6r1/8/8 w - - 2 2"
     );
-    expect(await stockfish.get_evaluation()).toBe({ type: "cp", value: 0 });
+    expect(await stockfish.get_evaluation()).toEqual({ type: "cp", value: 0 });
     stockfish.set_turn_perspective(!stockfish.get_turn_perspective());
-    expect(await stockfish.get_evaluation()).toBe({ type: "cp", value: 0 });
+    expect(await stockfish.get_evaluation()).toEqual({ type: "cp", value: 0 });
   });
 
   it("test_get_static_eval", async () => {
-    // const stockfish = await getDefaultStockfish();
-    // stockfish.set_turn_perspective(false);
-    // // stockfish.set_fen_position("r7/8/8/8/8/5k2/4p3/4K3 w - - 0 1")
-    // // static_eval_1 = stockfish.get_static_eval()
+    const stockfish = await getDefaultStockfish();
+    stockfish.set_turn_perspective(false);
+    await stockfish.set_fen_position("r7/8/8/8/8/5k2/4p3/4K3 w - - 0 1");
+    const static_eval_1 = await stockfish.get_static_eval();
     // expect(isinstance(static_eval_1, float) and static_eval_1 < -3
     // // stockfish.set_fen_position("r7/8/8/8/8/5k2/4p3/4K3 b - - 0 1")
     // // static_eval_2 = stockfish.get_static_eval()
     // expect(isinstance(static_eval_2, float) and static_eval_2 < -3
-    // // stockfish.set_turn_perspective()
+    // // stockfish.set_turn_perspective(true)
     // // static_eval_3 = stockfish.get_static_eval()
     // expect(isinstance(static_eval_3, float) and static_eval_3 > 3
     // // stockfish.set_fen_position("r7/8/8/8/8/5k2/4p3/4K3 w - - 0 1")
     // // static_eval_4 = stockfish.get_static_eval()
     // expect(isinstance(static_eval_4, float) and static_eval_4 < -3
     // // if stockfish.get_stockfish_major_version() >= 12:
-    // //     stockfish.set_fen_position("8/8/8/8/8/4k3/4p3/r3K3 w - - 0 1")
+    // //   await stockfish.set_fen_position("8/8/8/8/8/4k3/4p3/r3K3 w - - 0 1")
     // //     assert stockfish.get_static_eval()).toBeNull()
     // await stockfish.set_position();
     // // stockfish.get_static_eval()
@@ -657,10 +662,12 @@ describe("Stockfish", () => {
 
   it("test_parameters_functions", async () => {
     const stockfish = await getDefaultStockfish();
-    // //         old_parameters = stockfish.get_engine_parameters()
-    // //         stockfish.set_fen_position("4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100")
-    // expect(await stockfish.get_best_move()).toBe("f1g1"  // ensures Chess960 param).toBeFalse().
-    // expect(stockfish.get_fen_position()).toBe("4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100"
+    const old_parameters = stockfish.get_engine_parameters();
+    await stockfish.set_fen_position("4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100");
+    expect(await stockfish.get_best_move()).toBe("f1g1"); // ensures Chess960 param is False
+    expect(await stockfish.get_fen_position()).toBe(
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100"
+    );
     // expect("multipv 1" in stockfish.info
     // //         stockfish.update_engine_parameters(
     // //             {"Minimum Thinking Time": 10, "Hash": 32, "MultiPV": 2, "UCI_Chess960": true}
@@ -699,14 +706,14 @@ describe("Stockfish", () => {
 
   it("test_get_top_moves", async () => {
     const stockfish = await getDefaultStockfish();
-            stockfish.set_depth(15)
-    //         stockfish._set_option("MultiPV", 4)
-    //         stockfish.set_fen_position("1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1")
+    stockfish.set_depth(15);
+    //     await  stockfish._set_option("MultiPV", 4)
+    //       await stockfish.set_fen_position("1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1")
     // expect(stockfish.get_top_moves(2)).toBe([
     // //             {"Move": "e1e8", "Centipawn": None, "Mate": 1},
     // //             {"Move": "c8e8", "Centipawn": None, "Mate": 2},
     //         ])
-    // //         stockfish.set_fen_position("8/8/8/8/8/3r2k1/8/6K1 w - - 0 1")
+    // //       await stockfish.set_fen_position("8/8/8/8/8/3r2k1/8/6K1 w - - 0 1")
     // expect(stockfish.get_top_moves(2)).toBe([
     // //             {"Move": "g1f1", "Centipawn": None, "Mate": -2},
     // //             {"Move": "g1h1", "Centipawn": None, "Mate": -1},
@@ -723,8 +730,8 @@ describe("Stockfish", () => {
   it("test_get_top_moves_mate", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(10);
-    // stockfish._set_option("MultiPV", 3)
-    // stockfish.set_fen_position("8/8/8/8/8/6k1/8/3r2K1 w - - 0 1")
+    await stockfish._set_option("MultiPV", 3);
+    await stockfish.set_fen_position("8/8/8/8/8/6k1/8/3r2K1 w - - 0 1");
     // expect(stockfish.get_top_moves()).toBe([]
     // expect(stockfish.get_engine_parameters()["MultiPV"]).toBe(3
   });
@@ -759,24 +766,28 @@ describe("Stockfish", () => {
 
   it("test_get_top_moves_num_nodes", async () => {
     const stockfish = await getDefaultStockfish();
-    // //         stockfish.set_fen_position("8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50")
+    // //       await stockfish.set_fen_position("8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50")
     // //         moves = stockfish.get_top_moves(2, num_nodes=1000000, verbose=true)
     // expect(int(moves[0]["Nodes"]) >= 1000000
   });
 
   it("test_get_top_moves_preserve_globals", async () => {
     const stockfish = await getDefaultStockfish();
-    //         stockfish._set_option("MultiPV", 4)
-    //         stockfish.set_num_nodes(2000000)
-    //         stockfish.set_fen_position("1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1")
-    //         stockfish.get_top_moves(2, num_nodes=100000)
+    await stockfish._set_option("MultiPV", 4);
+    stockfish.set_num_nodes(2000000);
+    await stockfish.set_fen_position(
+      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1"
+    );
+    // stockfish.get_top_moves(2, num_nodes=100000)
     // expect(stockfish.get_num_nodes()).toBe(2000000
     // expect(stockfish.get_engine_parameters()["MultiPV"]).toBe(4
   });
 
   it("test_get_top_moves_raises_value_error", async () => {
     const stockfish = await getDefaultStockfish();
-    //         stockfish.set_fen_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    await stockfish.set_fen_position(
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
     //         with pytest.raises(ValueError):
     //             stockfish.get_top_moves(0)
     // expect(len(stockfish.get_top_moves(2))).toBe(2
@@ -816,12 +827,12 @@ describe("Stockfish", () => {
   });
 
   it("test_get_perft_different_position", async () => {
-    //     def test_get_perft_different_position(self, stockfish: Stockfish):
-    //         stockfish.set_fen_position("1k6/7Q/1K6/8/8/8/8/8 w - - 0 1")
-    //         num_nodes, move_possibilities = stockfish.get_perft(3)
-    // expect(num_nodes).toBe(1043
-    // expect(move_possibilities["h7g8"]).toBe(0
-    // expect(move_possibilities["h7b1"]).toBe(48
+    const stockfish = await getDefaultStockfish();
+    await stockfish.set_fen_position("1k6/7Q/1K6/8/8/8/8/8 w - - 0 1");
+    const { num_nodes, move_possibilities } = await stockfish.get_perft(3);
+    expect(num_nodes).toBe(1043);
+    expect(move_possibilities["h7g8"]).toBe(0);
+    expect(move_possibilities["h7b1"]).toBe(48);
   });
 
   it("test_flip", async () => {
@@ -831,7 +842,7 @@ describe("Stockfish", () => {
     // //             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
     // //            ).toBe(stockfish.get_fen_position()
     // //         )
-    // //         stockfish.set_fen_position("8/4q1k1/8/8/8/8/2K5/8 w - - 0 1")
+    // //       await stockfish.set_fen_position("8/4q1k1/8/8/8/8/2K5/8 w - - 0 1")
     // //         stockfish.flip()
     // expect("b" in stockfish.get_fen_position()
     // //         stockfish.flip()
@@ -868,7 +879,7 @@ describe("Stockfish", () => {
 
   it("test_make_moves_from_current_position", async () => {
     const stockfish = await getDefaultStockfish();
-    // //         stockfish.set_fen_position(
+    // //       await stockfish.set_fen_position(
     // //             "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1"
     // //         )
     // //         fen_1 = stockfish.get_fen_position()
@@ -893,7 +904,7 @@ describe("Stockfish", () => {
     // //             stockfish.get_fen_position()
     // //            ).toBe("r1b1kb1r/ppp1n1pp/2p5/4Pp2/8/2N2N1P/PPP2PP1/R1BR2K1 w - f6 0 9"
     // //         )
-    // //         stockfish.set_fen_position("r1bqk2r/pppp1ppp/8/8/1b2n3/2N5/PPP2PPP/R1BQK2R w Qkq - 0 1")
+    // //       await stockfish.set_fen_position("r1bqk2r/pppp1ppp/8/8/1b2n3/2N5/PPP2PPP/R1BQK2R w Qkq - 0 1")
     // //         invalid_moves = ["d1e3", "e1g1", "c3d5", "c1d4", "a7a6", "e1d2", "word"]
     // //         for invalid_move in invalid_moves:
     // //             with pytest.raises(ValueError):
@@ -913,7 +924,7 @@ describe("Stockfish", () => {
     //         """
     //         stockfish.set_depth(16)
     //         positions_considered = []
-    //         stockfish.set_fen_position("rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2")
+    //       await stockfish.set_fen_position("rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2")
     //         total_time_calculating_first = 0.0
     //         for i in range(5):
     //             start = default_timer()
@@ -924,7 +935,7 @@ describe("Stockfish", () => {
     //             stockfish.make_moves_from_current_position([chosen_move])
     //         total_time_calculating_second = 0.0
     //         for i in range(len(positions_considered)):
-    //             stockfish.set_fen_position(positions_considered[i])
+    //           await stockfish.set_fen_position(positions_considered[i])
     //             start = default_timer()
     //             stockfish.get_best_move()
     //             total_time_calculating_second += default_timer() - start
@@ -934,22 +945,22 @@ describe("Stockfish", () => {
   it("test_get_wdl_stats", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
-    //         stockfish._set_option("MultiPV", 2)
+    //     await  stockfish._set_option("MultiPV", 2)
     //         if stockfish.does_current_engine_version_have_wdl_option():
     //             stockfish.get_wdl_stats()  // Testing that this doesn't raise a RuntimeError.
-    //             stockfish.set_fen_position("7k/4R3/4P1pp/7N/8/8/1q5q/3K4 w - - 0 1")
+    //           await stockfish.set_fen_position("7k/4R3/4P1pp/7N/8/8/1q5q/3K4 w - - 0 1")
     //             wdl_stats = stockfish.get_wdl_stats()
     //             assert isinstance(wdl_stats, list)
     //             assert wdl_stats[1] > wdl_stats[0] * 7
     //             assert abs(wdl_stats[0] - wdl_stats[2]) / wdl_stats[0] < 0.15
-    //             stockfish.set_fen_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    //           await stockfish.set_fen_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     //             wdl_stats_2 = stockfish.get_wdl_stats()
     //             assert isinstance(wdl_stats_2, list)
     //             assert wdl_stats_2[1] > wdl_stats_2[0] * 3.5
     //             assert wdl_stats_2[0] > wdl_stats_2[2] * 1.8
-    //             stockfish.set_fen_position("8/8/8/8/8/6k1/6p1/6K1 w - - 0 1")
+    //           await stockfish.set_fen_position("8/8/8/8/8/6k1/6p1/6K1 w - - 0 1")
     //             assert stockfish.get_wdl_stats()).toBeNull()
-    //             stockfish.set_fen_position(
+    //           await stockfish.set_fen_position(
     //                 "rnbqkb1r/pp3ppp/3p1n2/1B2p3/3NP3/2N5/PPP2PPP/R1BQK2R b KQkq - 0 6"
     //             )
     //             wdl_stats_3 = stockfish.get_wdl_stats()
@@ -959,7 +970,7 @@ describe("Stockfish", () => {
     //             assert isinstance(wdl_stats_4, tuple) and len(wdl_stats_4)).toBe(3
     //             assert wdl_stats_3).toBe(list(wdl_stats_4)
     //             assert tuple(wdl_stats_3)).toBe(wdl_stats_4
-    //             stockfish.set_fen_position("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1")
+    //           await stockfish.set_fen_position("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1")
     //             assert stockfish.get_wdl_stats()).toBeNull()
     //             stockfish.set_skill_level(1)
     //             with pytest.warns(UserWarning):
@@ -1046,7 +1057,7 @@ describe("Stockfish", () => {
 
   it("test_what_is_on_square", async () => {
     const stockfish = await getDefaultStockfish();
-    //         stockfish.set_fen_position(
+    //       await stockfish.set_fen_position(
     //             "rnbq1rk1/ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6"
     //         )
     //         squares_and_contents: dict[str, Stockfish.Piece | None] = {
@@ -1194,39 +1205,39 @@ describe("Stockfish", () => {
 
   it("test_is_fen_valid", async () => {
     const stockfish = await getDefaultStockfish();
-    //         // old_params = stockfish.get_engine_parameters()
-    //         // old_info = stockfish.info
-    //         // old_depth = stockfish._depth
-    //         // old_fen = stockfish.get_fen_position()
-    //         // correct_fens: list[str | None] = [
-    //         //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    //         //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 8",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - 10 50",
-    //         //     "r1b1kb1r/ppp2ppp/3q4/8/P2Q4/8/1PP2PPP/RNB2RK1 w kq - 8 15",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - 99 50",
-    //         // ]
-    //         // invalid_syntax_fens = [
-    //         //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK b kq - 0 8",
-    //         //     "rnbqkb1r/pppp1ppp/4pn2/8/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 3",
-    //         //     "rn1q1rk1/pbppbppp/1p2pn2/8/2PP4/5NP1/PP2PPBP/RNBQ1RK1 w w - 5 7",
-    //         //     "4k3/8/4K3/71/8/8/8/8 w - - 10 50",
-    //         //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2R2 b kq - 0 8",
-    //         //     "r1bQ1b1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 8",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - 100 50",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - 101 50",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - -1 50",
-    //         //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0",
-    //         //     "r1b1kb1r/ppp2ppp/3q4/8/P2Q4/8/1PP2PPP/RNB2RK1 w kq - - 8 15",
-    //         //     "r1b1kb1r/ppp2ppp/3q4/8/P2Q4/8/1PP2PPP/RNB2RK1 w kq 8 15",
-    //         //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR W KQkq - 0 1",
-    //         //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR - KQkq - 0 1",
-    //         //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - - 8",
-    //         //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 -",
-    //         //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - -1 8",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - 99 e",
-    //         //     "4k3/8/4K3/8/8/8/8/8 w - - 99 ee",
-    //         // ]
-    //         // correct_fens.extend([None] * (len(invalid_syntax_fens) - len(correct_fens)))
+    const old_params = stockfish.get_engine_parameters();
+    const old_info = stockfish.info;
+    const old_depth = stockfish.get_depth();
+    const old_fen = await stockfish.get_fen_position();
+    // correct_fens: list[str | None] = [
+    //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 8",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - 10 50",
+    //     "r1b1kb1r/ppp2ppp/3q4/8/P2Q4/8/1PP2PPP/RNB2RK1 w kq - 8 15",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - 99 50",
+    // ]
+    // invalid_syntax_fens = [
+    //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK b kq - 0 8",
+    //     "rnbqkb1r/pppp1ppp/4pn2/8/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 3",
+    //     "rn1q1rk1/pbppbppp/1p2pn2/8/2PP4/5NP1/PP2PPBP/RNBQ1RK1 w w - 5 7",
+    //     "4k3/8/4K3/71/8/8/8/8 w - - 10 50",
+    //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2R2 b kq - 0 8",
+    //     "r1bQ1b1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 8",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - 100 50",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - 101 50",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - -1 50",
+    //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0",
+    //     "r1b1kb1r/ppp2ppp/3q4/8/P2Q4/8/1PP2PPP/RNB2RK1 w kq - - 8 15",
+    //     "r1b1kb1r/ppp2ppp/3q4/8/P2Q4/8/1PP2PPP/RNB2RK1 w kq 8 15",
+    //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR W KQkq - 0 1",
+    //     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR - KQkq - 0 1",
+    //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - - 8",
+    //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 -",
+    //     "r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - -1 8",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - 99 e",
+    //     "4k3/8/4K3/8/8/8/8/8 w - - 99 ee",
+    // ]
+    // correct_fens.extend([None] * (len(invalid_syntax_fens) - len(correct_fens)))
     // expect((correct_fens.length)).toBe((invalid_syntax_fens.length))
     // //         for correct_fen, invalid_syntax_fen in zip(correct_fens, invalid_syntax_fens):
     // //             if correct_fen).not.toBeNull():
