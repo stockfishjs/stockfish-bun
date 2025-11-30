@@ -1,9 +1,3 @@
-// import copy
-// import os
-// from dataclasses import dataclass
-// import re
-// import datetime
-
 export enum Piece {
   WHITE_PAWN = "P",
   BLACK_PAWN = "p",
@@ -88,7 +82,7 @@ export class Stockfish {
     "15.0": "2022-04-18",
   } as const;
 
-  private readonly _PIECE_CHARS = [
+  private static readonly _PIECE_CHARS = [
     "P",
     "N",
     "B",
@@ -185,7 +179,7 @@ export class Stockfish {
    * const stockfish = await Stockfish.create();
    * ```
    */
-  static async create(options?: {
+  static async start(options?: {
     path?: string;
     depth?: number;
     parameters?: Partial<StockfishParameters>;
@@ -221,9 +215,14 @@ export class Stockfish {
       Stockfish.DEFAULT_STOCKFISH_PARAMS
     );
     await stockfish.update_engine_parameters(parameters);
-    if (await stockfish.does_current_engine_version_have_wdl_option()) {
-      await stockfish._set_option("UCI_ShowWDL", true, false);
+    if (!(await stockfish._does_current_engine_version_have_wdl_option())) {
+      throw new Error(
+        `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
+This means that you are using an unsupported version of Stockfish.`
+      );
     }
+    await stockfish._set_option("UCI_ShowWDL", true, false);
+
     await stockfish._prepare_for_new_position(true);
     return stockfish;
   }
@@ -311,16 +310,17 @@ export class Stockfish {
   }
 
   private _put(command: UCICommand): void {
+    // console.debug({ command });
+
     if (!this._stockfish.stdin) {
       throw new BrokenPipeError();
     }
 
-    if (this._stockfish.exitCode !== null) {
+    if (this.has_quit) {
       return;
     }
 
     if (!this._has_quit_command_been_sent) {
-      // console.debug({ command });
       this._stockfish.stdin.write(`${command}\n`);
       this._stockfish.stdin.flush();
       if (command === "quit") {
@@ -333,7 +333,7 @@ export class Stockfish {
     if (!this._stockfish.stdout) {
       throw new BrokenPipeError();
     }
-    if (this._stockfish.exitCode !== null) {
+    if (this.has_quit) {
       throw new StockfishError("The Stockfish process has crashed");
     }
     while (true) {
@@ -546,13 +546,14 @@ export class Stockfish {
         if (perspective_white) {
           board_rep_lines.push(`${board_str}`);
         } else {
-          // // If the board is to be shown from black's point of view, all lines are
-          // // inverted horizontally and at the end the order of the lines is reversed.
-          // board_part = board_str[:33]
-          // // To keep the displayed numbers on the right side,
-          // // only the string representing the board is flipped.
-          // number_part = board_str[33:] if len(board_str) > 33 else ""
-          // board_rep_lines.push(f"{board_part[::-1]}{number_part}")
+          // If the board is to be shown from black's point of view, all lines are
+          // inverted horizontally and at the end the order of the lines is reversed.
+          const board_part = board_str.slice(0, 33);
+          // To keep the displayed numbers on the right side, only the string representing the board is flipped.
+          const number_part = board_str.length > 33 ? board_str.slice(33) : "";
+          board_rep_lines.push(
+            `${[...board_part].toReversed().join("")}${number_part}`
+          );
         }
       }
     }
@@ -763,17 +764,20 @@ export class Stockfish {
     for (const fenPart of fen_fields[0].split("/")) {
       let field_sum: number = 0;
       let previous_was_digit: boolean = false;
-      // for c in fenPart:
-      //     if "1" <= c <= "8":
-      //         if previous_was_digit:
-      //             return false  // Two digits next to each other.
-      //         field_sum += int(c)
-      //         previous_was_digit = true
-      //     elif c in Stockfish._PIECE_CHARS:
-      //         field_sum += 1
-      //         previous_was_digit = false
-      //     else:
-      //         return false  // Invalid character.
+      for (const c of fenPart) {
+        if ("1" <= c && c <= "8") {
+          if (previous_was_digit) {
+            return false; // Two digits next to each other.
+          }
+          field_sum += parseInt(c);
+          previous_was_digit = true;
+        } else if (Stockfish._PIECE_CHARS.includes(c)) {
+          field_sum += 1;
+          previous_was_digit = false;
+        } else {
+          return false; // Invalid character.
+        }
+      }
 
       if (field_sum !== 8) {
         return false; // One of the rows doesn't have 8 columns.
@@ -791,7 +795,7 @@ export class Stockfish {
       return false;
     }
 
-    const temp_sf: Stockfish = await Stockfish.create({
+    const temp_sf: Stockfish = await Stockfish.start({
       path: this._path,
       parameters: { Hash: 1 },
     });
@@ -827,7 +831,6 @@ export class Stockfish {
     this._put(`go depth 1 searchmoves ${move_value}`);
     const best_move = await this._get_best_move_from_sf_popen_process();
     const is_move_correct = best_move === move_value;
-    // console.debug({ move_value, best_move, is_move_correct });
     this.info = old_self_info;
     return is_move_correct;
   }
@@ -838,9 +841,10 @@ export class Stockfish {
    * @returns A tuple of three integers, unless the game is over, in which case `null` is returned.
    */
   async get_wdl_stats() {
-    if (!this.does_current_engine_version_have_wdl_option()) {
+    if (!this._does_current_engine_version_have_wdl_option()) {
       throw new Error(
-        "Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option."
+        `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
+This means that you are using an unsupported version of Stockfish.`
       );
     }
 
@@ -862,11 +866,15 @@ export class Stockfish {
       .at(-1)
       .split(/\s+/);
 
-    // wdl_index = split_line.index("wdl")
+    const wdl_index = split_line.indexOf("wdl");
 
-    // wdl_stats = [int(split_line[i]) for i in range(wdl_index + 1, wdl_index + 4)]
+    const wdl_stats = [
+      parseInt(split_line[wdl_index + 1]),
+      parseInt(split_line[wdl_index + 2]),
+      parseInt(split_line[wdl_index + 3]),
+    ] as const;
 
-    // return [wdl_stats[0], wdl_stats[1], wdl_stats[2]]
+    return wdl_stats;
   }
 
   /**
@@ -874,7 +882,7 @@ export class Stockfish {
    *
    * @returns `true` if Stockfish has the `WDL` option, otherwise `false`.
    */
-  async does_current_engine_version_have_wdl_option(): Promise<boolean> {
+  private async _does_current_engine_version_have_wdl_option(): Promise<boolean> {
     this._put("uci");
     while (true) {
       const splitted_text = (await this._read_line()).split(/\s+/);
@@ -903,8 +911,7 @@ export class Stockfish {
     }
 
     // If the user wants the evaluation specified relative to who is to move, this will be done.
-    // Otherwise, the evaluation will be in terms of white's side (positive meaning advantage white,
-    // negative meaning advantage black).
+    // Otherwise, the evaluation will be in terms of white's side (positive meaning advantage white, negative meaning advantage black).
     const compare =
       this.get_turn_perspective() ||
       (await this.get_fen_position()).includes("w")
@@ -978,7 +985,7 @@ export class Stockfish {
    */
   async get_top_moves(
     num_top_moves: number = 5,
-    options?: { verbose: boolean; num_nodes: number }
+    options?: { verbose?: boolean; num_nodes?: number }
   ) {
     const { verbose = false, num_nodes = 0 } = { ...options };
 
@@ -1017,7 +1024,19 @@ export class Stockfish {
 
     // Stockfish is now done evaluating the position, and the output is stored in the 'lines' array
 
-    let top_moves = [];
+    interface MoveEvaluation {
+      Move: string;
+      Centipawn: number | null;
+      Mate: number | null;
+      Time?: string;
+      Nodes?: string;
+      MultiPVLine?: string;
+      NodesPerSecond?: string;
+      SelectiveDepth?: string;
+      WDL?: [string, string, string];
+    }
+
+    let top_moves: MoveEvaluation[] = [];
 
     // Set perspective of evaluations.
     // If get_turn_perspective() is true, or white to move, use Stockfish's values, otherwise invert values.
@@ -1030,7 +1049,7 @@ export class Stockfish {
     // loop through Stockfish output lines in reverse order
     for (const line of lines.toReversed()) {
       // If the line is a "bestmove" line, and the best move is "(none)", then
-      // there are no top moves, and we're done. Otherwise, continue with the next line.
+      // there are no top moves, and we are done. Otherwise, continue with the next line.
 
       if (line[0] === "bestmove") {
         if (line[1] === "(none)") {
@@ -1040,41 +1059,58 @@ export class Stockfish {
         continue;
       }
 
-      // // if the line has no relevant info, we're done
-      // if ("multipv" not in line) or ("depth" not in line):
-      //     break
-      // // if we're searching depth and the line is not our desired depth, we're done
-      // if (num_nodes === 0) and (int(this._pick(line, "depth")) !==this._depth):
-      //     break
-      // // if we're searching nodes and the line has less than desired number of nodes, we're done
-      // if (num_nodes > 0) and (int(this._pick(line, "nodes")) < this._num_nodes):
-      //     break
-      // move_evaluation: dict[str, str | int | null] = {
-      //     // get move
-      //     "Move": this._pick(line, "pv"),
-      //     // get cp if available
-      //     "Centipawn": (int(this._pick(line, "cp")) * perspective if "cp" in line else null),
-      //     // get mate if available
-      //     "Mate": (int(this._pick(line, "mate")) * perspective if "mate" in line else null),
-      // }
-      // // add more info if verbose
-      // if verbose:
-      //     move_evaluation["Time"] = this._pick(line, "time")
-      //     move_evaluation["Nodes"] = this._pick(line, "nodes")
-      //     move_evaluation["MultiPVLine"] = this._pick(line, "multipv")
-      //     move_evaluation["NodesPerSecond"] = this._pick(line, "nps")
-      //     move_evaluation["SelectiveDepth"] = this._pick(line, "seldepth")
-      //     // add wdl if available
-      //     if this.does_current_engine_version_have_wdl_option():
-      //         move_evaluation["WDL"] = " ".join(
-      //             [
-      //                 this._pick(line, "wdl", 1),
-      //                 this._pick(line, "wdl", 2),
-      //                 this._pick(line, "wdl", 3),
-      //             ][::perspective]
-      //         )
-      // // add move to list of top moves
-      // top_moves.insert(0, move_evaluation)
+      // if the line has no relevant info, we are done
+      if (!line.includes("multipv") || !line.includes("depth")) {
+        break;
+      }
+
+      // if we are searching depth and the line is not our desired depth, we are done
+      if (
+        num_nodes === 0 &&
+        parseInt(this._pick(line, "depth")) !== this._depth
+      ) {
+        break;
+      }
+
+      // if we are searching nodes and the line has less than desired number of nodes, we are done
+      if (
+        num_nodes > 0 &&
+        parseInt(this._pick(line, "nodes")) < this._num_nodes
+      ) {
+        break;
+      }
+
+      const move_evaluation: MoveEvaluation = {
+        // get move
+        Move: this._pick(line, "pv"),
+        // // get cp if available
+        Centipawn: line.includes("cp")
+          ? parseInt(this._pick(line, "cp")) * perspective
+          : null,
+        Mate: line.includes("mate")
+          ? parseInt(this._pick(line, "mate")) * perspective
+          : null,
+      };
+
+      // add more info if verbose
+      if (verbose) {
+        move_evaluation.Time = this._pick(line, "time");
+        move_evaluation.Nodes = this._pick(line, "nodes");
+        move_evaluation.MultiPVLine = this._pick(line, "multipv");
+        move_evaluation.NodesPerSecond = this._pick(line, "nps");
+        move_evaluation.SelectiveDepth = this._pick(line, "seldepth");
+
+        // move_evaluation["WDL"] = " ".join(
+        //     [
+        //         this._pick(line, "wdl", 1),
+        //         this._pick(line, "wdl", 2),
+        //         this._pick(line, "wdl", 3),
+        //     ][::perspective]
+        // )
+      }
+
+      // add move to list of top moves
+      top_moves.splice(0, 0, move_evaluation);
     }
 
     // reset MultiPV to global value
@@ -1095,7 +1131,10 @@ export class Stockfish {
    *
    * @param depth The search depth given as an integer (1 or higher)
    */
-  async get_perft(depth: number) {
+  async get_perft(depth: number): Promise<{
+    readonly num_nodes: number;
+    readonly move_possibilities: Record<string, number>;
+  }> {
     if (depth < 1) {
       throw new TypeError("depth must be an integer higher than 0");
     }
@@ -1107,13 +1146,16 @@ export class Stockfish {
     while (true) {
       const line = await this._read_line();
       if (line.includes("searched")) {
-        const num_nodes = parseInt(line.split(":")[1]);
+        num_nodes = parseInt(line.split(":")[1]);
         break;
       }
 
       const [move, num] = line.split(":");
-      // assert move not in move_possibilities
-      // move_possibilities[move] = int(num)
+      if (Object.keys(move_possibilities).includes(move)) {
+        throw new Error("assert move not in move_possibilities");
+      }
+
+      move_possibilities[move] = parseInt(num);
     }
     return { num_nodes, move_possibilities } as const;
   }
@@ -1136,18 +1178,21 @@ export class Stockfish {
    *
    * @returns object if the square is empty.
    */
-  async get_what_is_on_square(square: string) {
+  async get_what_is_on_square(square: string): Promise<Piece | null> {
     const file_letter: string = square[0].toLowerCase();
     const rank_num: number = parseInt(square[1]);
 
-    // if (
-    //     len(square) !== 2
-    //     || file_letter < "a"
-    //     || file_letter > "h"
-    //     || square[1] < "1"
-    //     || square[1] > "8"
-    // ):
-    //     throw new Error("square argument to the get_what_is_on_square function isn't valid.")
+    if (
+      square.length !== 2 ||
+      file_letter < "a" ||
+      file_letter > "h" ||
+      square[1] < "1" ||
+      square[1] > "8"
+    ) {
+      throw new Error(
+        "square argument to the get_what_is_on_square function isn't valid."
+      );
+    }
 
     const rank_visual: string = (await this.get_board_visual()).split(/\r?\n/)[
       17 - 2 * rank_num
@@ -1170,7 +1215,7 @@ export class Stockfish {
    * @returns whether the proposed move will be a direct capture, en passant, or not a capture at all.
    */
   async will_move_be_a_capture(move_value: string): Promise<Capture> {
-    if (!this.is_move_correct(move_value)) {
+    if (!(await this.is_move_correct(move_value))) {
       throw new Error(
         "The proposed move is not valid in the current position."
       );
@@ -1282,8 +1327,9 @@ export class Stockfish {
         this._version.sha = this._version.text.split("-")[2];
         // get major.minor version as text from build date
         const build_date = this._version.text.split("-")[1];
-        const date_string =
-          "{int(build_date[:4])}-{int(build_date[4:6]):02d}-{int(build_date[6:8]):02d}";
+        const date_string = `${parseInt(build_date.slice(0, 4))}-${parseInt(
+          build_date.slice(4, 6)
+        )}-${parseInt(build_date.slice(6, 8))}`;
         this._version.text =
           this._get_stockfish_version_from_build_date(date_string);
       }
@@ -1292,11 +1338,13 @@ export class Stockfish {
       if (this._version.text.length === 6) {
         this._version.is_dev_build = true;
         // parse version number from DDMMYY
-        this._version["patch"] = this._version.text;
+        this._version.patch = this._version.text;
         // parse build date from dev version text
         const build_date = this._version.text;
-        const date_string =
-          "20{build_date[4:6]}-{build_date[2:4]}-{build_date[0:2]}";
+        const date_string = `20${build_date.slice(4, 6)}-${build_date.slice(
+          2,
+          4
+        )}-${build_date.slice(0, 2)}`;
         this._version.text =
           this._get_stockfish_version_from_build_date(date_string);
       }
@@ -1317,7 +1365,9 @@ export class Stockfish {
     }
   }
 
-  private _get_stockfish_version_from_build_date(date_string: string = "") {
+  private _get_stockfish_version_from_build_date(
+    date_string: string = ""
+  ): string {
     // Convert date string to datetime object
     const date_object = new Date(date_string);
     // Convert release date strings to datetime objects
@@ -1350,57 +1400,15 @@ export class Stockfish {
   /**
    * Sends the 'quit' command to the Stockfish engine, getting the process to stop.
    */
-  send_quit_command(): void {
-    if (this._stockfish.exitCode === null) {
-      this._put("quit");
-      while (this._stockfish.exitCode === null);
-    }
+  async quit_stockfish(): Promise<void> {
+    if (this.has_quit) return;
+    this._put("quit");
+    await this._stockfish.exited;
   }
 
-  // @dataclass
-  // class BenchmarkParameters:
-  //     ttSize: number = 16
-  //     threads: number = 1
-  //     limit: number = 13
-  //     fenFile: string = "default"
-  //     limitType: string = "depth"
-  //     evalType: string = "mixed"
-
-  //      __post_init__(this):
-  //         this.ttSize = this.ttSize if this.ttSize in range(1, 128001) else 16
-  //         this.threads = this.threads if this.threads in range(1, 513) else 1
-  //         this.limit = this.limit if this.limit in range(1, 10001) else 13
-  //         this.fenFile = (
-  //             this.fenFile
-  //             if this.fenFile.endswith(".fen") and os.path.isfile(this.fenFile)
-  //             else "default"
-  //         )
-  //         this.limitType = (
-  //             this.limitType
-  //             if this.limitType in ["depth", "perft", "nodes", "movetime"]
-  //             else "depth"
-  //         )
-  //         this.evalType = (
-  //             this.evalType if this.evalType in ["mixed", "classical", "NNUE"] else "mixed"
-  //         )
-
-  /**
-   * Benchmark will run the bench command with BenchmarkParameters.
-   * It is an Additional custom non-UCI command, mainly for debugging.
-   * Do not use this command during a search!
-   */
-  //  benchmark(params: BenchmarkParameters): string
-
-  //     if type(params) !==this.BenchmarkParameters:
-  //         params = this.BenchmarkParameters()
-
-  //     this._put(
-  //         f"bench {params.ttSize} {params.threads} {params.limit} {params.fenFile} {params.limitType} {params.evalType}"
-  //     )
-  //     while true:
-  //         text = this._read_line()
-  //         if text.split(/\s+/)[0] === "Nodes/second":
-  //             return text
+  get has_quit(): boolean {
+    return this._stockfish.exitCode !== null;
+  }
 }
 
 export class StockfishError extends Error {}
