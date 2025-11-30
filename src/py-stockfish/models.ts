@@ -334,7 +334,7 @@ This means that you are using an unsupported version of Stockfish.`
       throw new BrokenPipeError();
     }
     if (this.has_quit) {
-      throw new StockfishError("The Stockfish process has crashed");
+      throw new StockfishError();
     }
     while (true) {
       const newlineIndex = this._lineBuffer.indexOf("\n");
@@ -345,7 +345,19 @@ This means that you are using an unsupported version of Stockfish.`
         if (line.length === 0) continue;
         return line;
       }
-      const { value, done } = await this._stdoutReader.read();
+      const readerPromise = this._stdoutReader.read();
+      const exitPromise = this._stockfish.exited.then(() => {
+        throw new StockfishError();
+      });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new StockfishError("Read Timeout")), 2000)
+      );
+      // console.debug("Waiting for _stdoutReader");
+      const { value, done } = await Promise.race([
+        readerPromise,
+        exitPromise,
+        timeoutPromise,
+      ]);
       if (done) {
         if (this._lineBuffer.length > 0) {
           const line = this._lineBuffer.trim();
@@ -715,8 +727,10 @@ This means that you are using an unsupported version of Stockfish.`
    */
   private async _get_best_move_from_sf_popen_process(): Promise<string | null> {
     const lines: string[] = await this._get_sf_go_command_output();
+    // console.debug({ lines });
     this.info = lines.at(-2);
     const last_line_split = lines.at(-1).split(/\s+/);
+    // console.debug({ last_line_split });
     if (last_line_split[1] === "(none)") return null;
     return last_line_split[1];
   }
@@ -731,6 +745,7 @@ This means that you are using an unsupported version of Stockfish.`
     const lines: string[] = [];
     while (true) {
       lines.push(await this._read_line());
+      // console.debug("_get_sf_go_command_output", { lines });
       // The "bestmove" line is the last line of the output.
       if (lines.at(-1).startsWith("bestmove")) {
         return lines;
@@ -738,7 +753,7 @@ This means that you are using an unsupported version of Stockfish.`
     }
   }
 
-  private static _is_fen_syntax_valid(fen: string): boolean {
+  public static is_fen_syntax_valid(fen: string): boolean {
     // Code for this function taken from: https://gist.github.com/Dani4kor/e1e8b439115878f8c6dcf127a4ed5d3e
     // Some small changes have been made to the code.
     if (
@@ -790,33 +805,32 @@ This means that you are using an unsupported version of Stockfish.`
   /**
    * Checks if FEN string is valid.
    */
-  async is_fen_valid(fen: string) {
-    if (!Stockfish._is_fen_syntax_valid(fen)) {
+  async is_fen_valid(fen: string): Promise<boolean> {
+    if (!Stockfish.is_fen_syntax_valid(fen)) {
       return false;
     }
 
-    const temp_sf: Stockfish = await Stockfish.start({
+    // Using a new temporary SF instance, in case the fen is an illegal position that causes the SF process to crash.
+    const temp_sf = await Stockfish.start({
       path: this._path,
       parameters: { Hash: 1 },
     });
-    // Using a new temporary SF instance, in case the fen is an illegal position that causes the SF process to crash.
-    let best_move: string | null = null;
 
-    // temp_sf.set_fen_position(fen, false)
-    // try:
-    //     temp_sf._put("go depth 10")
-    //     best_move = temp_sf._get_best_move_from_sf_popen_process()
-    // except StockfishException:
-    //     // If a StockfishException is thrown, then it happened in read_line() since the SF process crashed.
-    //     // This is likely due to the position being illegal, so set the var to false:
-    //     return false
-    // else:
-    //     return best_move is not null
-    // finally:
-    //     temp_sf.__del__()
-    //     // Calling this function before returning from either the except or else block above.
-    //     // The __del__ function should generally be called implicitly by python when this
-    //     // temp_sf object goes out of scope, but calling it explicitly guarantees this will happen.
+    await temp_sf.set_fen_position(fen, false);
+    try {
+      temp_sf._put("go depth 10");
+      const best_move = await temp_sf._get_best_move_from_sf_popen_process();
+      // console.debug({ best_move });
+      return best_move !== null;
+    } catch (e) {
+      // console.debug({ e });
+      // If a StockfishError is thrown, then it happened in read_line() since the SF process crashed.
+      // This is likely due to the position being illegal, so return false
+      if (e instanceof StockfishError) return false;
+      return false;
+    } finally {
+      await temp_sf.kill_stockfish();
+    }
   }
 
   /**
@@ -841,7 +855,7 @@ This means that you are using an unsupported version of Stockfish.`
    * @returns A tuple of three integers, unless the game is over, in which case `null` is returned.
    */
   async get_wdl_stats() {
-    if (!this._does_current_engine_version_have_wdl_option()) {
+    if (!(await this._does_current_engine_version_have_wdl_option())) {
       throw new Error(
         `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
 This means that you are using an unsupported version of Stockfish.`
@@ -925,6 +939,7 @@ This means that you are using an unsupported version of Stockfish.`
     }
 
     const lines = await this._get_sf_go_command_output();
+    // console.debug({ lines });
     const split_line = lines
       .filter((line) => line.startsWith("info"))
       .at(-1)
@@ -1083,7 +1098,7 @@ This means that you are using an unsupported version of Stockfish.`
       const move_evaluation: MoveEvaluation = {
         // get move
         Move: this._pick(line, "pv"),
-        // // get cp if available
+        // get cp if available
         Centipawn: line.includes("cp")
           ? parseInt(this._pick(line, "cp")) * perspective
           : null,
@@ -1409,9 +1424,20 @@ This means that you are using an unsupported version of Stockfish.`
   get has_quit(): boolean {
     return this._stockfish.exitCode !== null;
   }
+
+  async kill_stockfish(): Promise<void> {
+    this._stockfish.kill();
+    await this._stockfish.exited;
+  }
 }
 
-export class StockfishError extends Error {}
+export class StockfishError extends Error {
+  override readonly name = "StockfishError";
+
+  constructor(message = "The Stockfish process has crashed") {
+    super(message);
+  }
+}
 
 class BrokenPipeError extends Error {
   override readonly name = "BrokenPipeError";
