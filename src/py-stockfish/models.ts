@@ -1001,7 +1001,7 @@ This means that you are using an unsupported version of Stockfish.`
   async get_top_moves(
     num_top_moves: number = 5,
     options?: { verbose?: boolean; num_nodes?: number }
-  ) {
+  ): Promise<[MoveEvaluation, ...MoveEvaluation[]]> {
     const { verbose = false, num_nodes = 0 } = { ...options };
 
     if (num_top_moves <= 0) {
@@ -1038,18 +1038,6 @@ This means that you are using an unsupported version of Stockfish.`
     );
 
     // Stockfish is now done evaluating the position, and the output is stored in the 'lines' array
-
-    interface MoveEvaluation {
-      Move: string;
-      Centipawn: number | null;
-      Mate: number | null;
-      Time?: string;
-      Nodes?: string;
-      MultiPVLine?: string;
-      NodesPerSecond?: string;
-      SelectiveDepth?: string;
-      WDL?: [string, string, string];
-    }
 
     let top_moves: MoveEvaluation[] = [];
 
@@ -1429,6 +1417,18 @@ This means that you are using an unsupported version of Stockfish.`
     this._stockfish.kill();
     await this._stockfish.exited;
   }
+}
+
+interface MoveEvaluation {
+  Move: string;
+  Centipawn: number | null;
+  Mate: number | null;
+  Time?: string;
+  Nodes?: string;
+  MultiPVLine?: string;
+  NodesPerSecond?: string;
+  SelectiveDepth?: string;
+  WDL?: [string, string, string];
 }
 
 export class StockfishError extends Error {
