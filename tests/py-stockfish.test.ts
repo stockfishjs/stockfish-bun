@@ -14,11 +14,12 @@ describe("Stockfish", () => {
     expect(stockfish).toBeDefined();
     expect(stockfish).toBeInstanceOf(Stockfish);
     expect(stockfish.get_engine_parameters()).toEqual(
-      Stockfish.DEFAULT_STOCKFISH_PARAMS
+      Stockfish.DEFAULT_STOCKFISH_PARAMS,
     );
     expect(stockfish.get_depth()).toBe(15);
     expect(stockfish.get_num_nodes()).toBe(1000000);
     expect(stockfish.get_turn_perspective()).toBeTrue();
+    await stockfish.quit_stockfish();
   });
 
   it("constructor options", async () => {
@@ -34,18 +35,21 @@ describe("Stockfish", () => {
     expect(stockfish.get_turn_perspective()).toBeFalse();
     expect(stockfish.get_engine_parameters().Threads).toBe(2);
     expect(stockfish.get_engine_parameters().UCI_Elo).toBe(1500);
+    await stockfish.quit_stockfish();
   });
 
   it("get best move first move", async () => {
     const stockfish = await getDefaultStockfish();
     const best_move = await stockfish.get_best_move();
     expect(best_move).toBeOneOf(["e2e3", "e2e4", "g1f3", "b1c3", "d2d4"]);
+    await stockfish.quit_stockfish();
   });
 
   it("get best move time first move", async () => {
     const stockfish = await getDefaultStockfish();
     const best_move = await stockfish.get_best_move_time(1000);
     expect(best_move).toBeOneOf(["e2e3", "e2e4", "g1f3", "b1c3", "d2d4"]);
+    await stockfish.quit_stockfish();
   });
 
   it("get best move remaining time first move", async () => {
@@ -68,6 +72,7 @@ describe("Stockfish", () => {
       btime: 1000,
     });
     expect(best_move).toBeOneOf(["e2e3", "e2e4", "g1f3", "b1c3", "d2d4"]);
+    await stockfish.quit_stockfish();
   });
 
   it("set position resets info", async () => {
@@ -77,6 +82,7 @@ describe("Stockfish", () => {
     expect(stockfish.info).not.toBe("");
     await stockfish.set_position(["e2e4", "e7e6"]);
     expect(stockfish.info).toBe("");
+    await stockfish.quit_stockfish();
   });
 
   it("get best move not first move", async () => {
@@ -84,6 +90,7 @@ describe("Stockfish", () => {
     await stockfish.set_position(["e2e4", "e7e6"]);
     const best_move = await stockfish.get_best_move();
     expect(best_move).toBeOneOf(["d2d4", "g1f3"]);
+    await stockfish.quit_stockfish();
   });
 
   it("get best move time not first move", async () => {
@@ -91,6 +98,7 @@ describe("Stockfish", () => {
     await stockfish.set_position(["e2e4", "e7e6"]);
     const best_move = await stockfish.get_best_move_time(1000);
     expect(best_move).toBeOneOf(["d2d4", "g1f3"]);
+    await stockfish.quit_stockfish();
   });
 
   it("get best move remaining time not first move", async () => {
@@ -107,6 +115,7 @@ describe("Stockfish", () => {
       btime: 1000,
     });
     expect(best_move).toBeOneOf(["e2e3", "e2e4", "g1f3", "b1c3", "d2d4"]);
+    await stockfish.quit_stockfish();
   });
 
   it("get best move checkmate", async () => {
@@ -114,6 +123,7 @@ describe("Stockfish", () => {
     await stockfish.set_position(["f2f3", "e7e5", "g2g4", "d8h4"]);
     const best_move = await stockfish.get_best_move();
     expect(best_move).toBeNull();
+    await stockfish.quit_stockfish();
   });
 
   it("get best move time checkmate", async () => {
@@ -129,17 +139,17 @@ describe("Stockfish", () => {
     expect(await stockfish.get_best_move({ wtime: 1000 })).toBeNull();
     expect(await stockfish.get_best_move({ btime: 1000 })).toBeNull();
     expect(
-      await stockfish.get_best_move({ wtime: 1000, btime: 1000 })
+      await stockfish.get_best_move({ wtime: 1000, btime: 1000 }),
     ).toBeNull();
     expect(
-      await stockfish.get_best_move({ wtime: 5 * 60 * 1000, btime: 1000 })
+      await stockfish.get_best_move({ wtime: 5 * 60 * 1000, btime: 1000 }),
     ).toBeNull();
   });
 
   it("set fen position", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "7r/1pr1kppb/2n1p2p/2NpP2P/5PP1/1P6/P6K/R1R2B2 w - - 1 27"
+      "7r/1pr1kppb/2n1p2p/2NpP2P/5PP1/1P6/P6K/R1R2B2 w - - 1 27",
     );
     expect(await stockfish.is_move_correct("f4f5")).toBeTrue();
     expect(await stockfish.is_move_correct("a1c1")).toBeFalse();
@@ -149,7 +159,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     expect(await stockfish.is_move_correct("e1g1")).toBeFalse();
     await stockfish.set_fen_position(
-      "rnbqkbnr/ppp3pp/3ppp2/8/4P3/5N2/PPPPBPPP/RNBQK2R w KQkq - 0 4"
+      "rnbqkbnr/ppp3pp/3ppp2/8/4P3/5N2/PPPPBPPP/RNBQK2R w KQkq - 0 4",
     );
     expect(await stockfish.is_move_correct("e1g1")).toBeTrue();
   });
@@ -171,7 +181,7 @@ describe("Stockfish", () => {
     await stockfish.get_best_move();
     await stockfish.set_fen_position(
       "8/8/8/6pp/8/4k1PP/8/r3K3 w - - 12 53",
-      false
+      false,
     );
     expect(stockfish.info).toBe("");
   });
@@ -179,12 +189,12 @@ describe("Stockfish", () => {
   it("set fen position starts new game", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "7r/1pr1kppb/2n1p2p/2NpP2P/5PP1/1P6/P6K/R1R2B2 w - - 1 27"
+      "7r/1pr1kppb/2n1p2p/2NpP2P/5PP1/1P6/P6K/R1R2B2 w - - 1 27",
     );
     await stockfish.get_best_move();
     expect(stockfish.info).not.toBe("");
     await stockfish.set_fen_position(
-      "3kn3/p5rp/1p3p2/3B4/3P1P2/2P5/1P3K2/8 w - - 0 53"
+      "3kn3/p5rp/1p3p2/3B4/3P1P2/2P5/1P3K2/8 w - - 0 53",
     );
     expect(stockfish.info).toBe("");
   });
@@ -194,17 +204,17 @@ describe("Stockfish", () => {
     stockfish.set_depth(16);
     await stockfish.set_fen_position(
       "rnbqk2r/pppp1ppp/3bpn2/8/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 1",
-      true
+      true,
     );
     expect(await stockfish.get_best_move()).toBe("e4e5");
     await stockfish.set_fen_position(
       "rnbqk2r/pppp1ppp/3bpn2/4P3/3P4/2N5/PPP2PPP/R1BQKBNR b KQkq - 0 1",
-      false
+      false,
     );
     expect(await stockfish.get_best_move()).toBeOneOf(["d6e7", "d6b4"]);
     await stockfish.set_fen_position(
       "rnbqk2r/pppp1ppp/3bpn2/8/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 1",
-      false
+      false,
     );
     expect(await stockfish.get_best_move()).toBe("e4e5");
   });
@@ -225,7 +235,7 @@ describe("Stockfish", () => {
   it("last info", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "r6k/6b1/2b1Q3/p6p/1p5q/3P2PP/5r1K/8 w - - 1 31"
+      "r6k/6b1/2b1Q3/p6p/1p5q/3P2PP/5r1K/8 w - - 1 31",
     );
     await stockfish.get_best_move();
     for (const value of [
@@ -251,7 +261,7 @@ describe("Stockfish", () => {
   it("set_skill_level", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "rnbqkbnr/ppp2ppp/3pp3/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1"
+      "rnbqkbnr/ppp2ppp/3pp3/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1",
     );
     expect(stockfish.get_engine_parameters()["Skill Level"]).toBe(20);
     await stockfish.set_skill_level(1);
@@ -278,7 +288,7 @@ describe("Stockfish", () => {
   it("set_elo_rating", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "rnbqkbnr/ppp2ppp/3pp3/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1"
+      "rnbqkbnr/ppp2ppp/3pp3/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1",
     );
     expect(stockfish.get_engine_parameters().UCI_Elo).toBe(1350);
     await stockfish.set_elo_rating(2000);
@@ -324,7 +334,7 @@ describe("Stockfish", () => {
   it("resume_full_strength", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "1r1qrbk1/2pb1pp1/p4n1p/P3P3/3P4/NB4BP/6P1/R2QR1K1 b - - 0 1"
+      "1r1qrbk1/2pb1pp1/p4n1p/P3P3/3P4/NB4BP/6P1/R2QR1K1 b - - 0 1",
     );
     stockfish.set_depth(13);
     await stockfish.set_elo_rating(1350);
@@ -346,18 +356,16 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     const old_parameters = {
       "Debug Log File": "",
-      Contempt: 0,
-      "Min Split Depth": 0,
       Threads: 1,
       Ponder: false,
       Hash: 16,
       MultiPV: 1,
       "Skill Level": 20,
       "Move Overhead": 10,
-      "Minimum Thinking Time": 20,
       UCI_Chess960: false,
       UCI_LimitStrength: false,
       UCI_Elo: 1350,
+      UCI_ShowWDL: false,
     };
     const expected_parameters = structuredClone(old_parameters);
     await stockfish.set_skill_level(1);
@@ -383,7 +391,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
 
     expect(Object.keys(stockfish.get_engine_parameters())).toEqual(
-      expect.arrayContaining(Object.keys(Stockfish._PARAM_RESTRICTIONS))
+      expect.arrayContaining(Object.keys(Stockfish._PARAM_RESTRICTIONS)),
     );
 
     const bad_values = {
@@ -399,11 +407,9 @@ describe("Stockfish", () => {
     for (const name in bad_values) {
       for (const val of bad_values[name as keyof typeof bad_values]) {
         expect(
-          stockfish.update_engine_parameters({ [name]: val })
+          stockfish.update_engine_parameters({ [name]: val }),
         ).rejects.toThrow(TypeError);
-        expect(stockfish._set_option({ [name]: val })).rejects.toThrow(
-          TypeError
-        );
+        expect(stockfish._set_option(name, val)).rejects.toThrow(TypeError);
       }
     }
   });
@@ -431,10 +437,10 @@ describe("Stockfish", () => {
     });
     // fails, gives DIRECT_CAPTURE
     expect(await stockfish.will_move_be_a_capture("f1h1")).toBe(
-      Capture.NO_CAPTURE
+      Capture.NO_CAPTURE,
     );
     expect(await stockfish.will_move_be_a_capture("f1e1")).toBe(
-      Capture.DIRECT_CAPTURE
+      Capture.DIRECT_CAPTURE,
     );
     await stockfish.update_engine_parameters({ UCI_Chess960: false });
     expect(stockfish.get_engine_parameters()).toEqual(old_parameters);
@@ -450,7 +456,7 @@ describe("Stockfish", () => {
       value: 2,
     });
     expect(await stockfish.will_move_be_a_capture("f1g1")).toBe(
-      Capture.NO_CAPTURE
+      Capture.NO_CAPTURE,
     );
   });
 
@@ -509,7 +515,7 @@ describe("Stockfish", () => {
   it("get fen position", async () => {
     const stockfish = await getDefaultStockfish();
     expect(await stockfish.get_fen_position()).toBe(
-      Stockfish.STARTING_POSITION_FEN
+      Stockfish.STARTING_POSITION_FEN,
     );
   });
 
@@ -517,7 +523,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_position(["e2e4", "e7e6"]);
     expect(await stockfish.get_fen_position()).toBe(
-      "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+      "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
     );
   });
 
@@ -525,7 +531,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(20);
     await stockfish.set_fen_position(
-      "r4rk1/pppb1p1p/2nbpqp1/8/3P4/3QBN2/PPP1BPPP/R4RK1 w - - 0 11"
+      "r4rk1/pppb1p1p/2nbpqp1/8/3P4/3QBN2/PPP1BPPP/R4RK1 w - - 0 11",
     );
     const evaluation = await stockfish.get_evaluation();
     expect(evaluation.type).toBe("cp");
@@ -542,12 +548,12 @@ describe("Stockfish", () => {
   it("get_evaluation time", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "r4rk1/pppb1p1p/2nbpqp1/8/3P4/3QBN2/PPP1BPPP/R4RK1 w - - 0 11"
+      "r4rk1/pppb1p1p/2nbpqp1/8/3P4/3QBN2/PPP1BPPP/R4RK1 w - - 0 11",
     );
     const start = Date.now();
     const evaluation = await stockfish.get_evaluation(5000);
     const end = Date.now();
-    expect(end - start).toBeCloseTo(5000);
+    expect(end - start).toBeCloseTo(5000, -2);
     expect(evaluation.type).toBe("cp");
     expect(evaluation.value).toBeWithin(30, 120);
   }, 7000);
@@ -555,7 +561,7 @@ describe("Stockfish", () => {
   it("evaluation checkmate", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "1nb1k1n1/pppppppp/8/6r1/5bqK/6r1/8/8 w - - 2 2"
+      "1nb1k1n1/pppppppp/8/6r1/5bqK/6r1/8/8 w - - 2 2",
     );
     expect(await stockfish.get_evaluation()).toEqual({
       type: "mate",
@@ -566,7 +572,7 @@ describe("Stockfish", () => {
   it("evaluation stalemate", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "1nb1kqn1/pppppppp/8/6r1/5b1K/6r1/8/8 w - - 2 2"
+      "1nb1kqn1/pppppppp/8/6r1/5b1K/6r1/8/8 w - - 2 2",
     );
     expect(await stockfish.get_evaluation()).toEqual({ type: "cp", value: 0 });
     stockfish.set_turn_perspective(!stockfish.get_turn_perspective());
@@ -607,6 +613,7 @@ describe("Stockfish", () => {
   it("set_depth raises type error", async () => {
     const stockfish = await getDefaultStockfish();
     for (const depth of ["12", true, 12.1, 0, null]) {
+      // @ts-expect-error ts(2345)
       expect(() => stockfish.set_depth(depth)).toThrow(TypeError);
     }
   });
@@ -630,6 +637,7 @@ describe("Stockfish", () => {
   it("set_num_nodes raises type error", async () => {
     const stockfish = await getDefaultStockfish();
     for (const num_nodes of ["100", 100.1, null, true]) {
+      // @ts-expect-error ts(2345)
       expect(() => stockfish.set_num_nodes(num_nodes)).toThrow(TypeError);
     }
   });
@@ -654,14 +662,15 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     // Will also use a new stockfish instance in order to test sending params to the constructor.
     const stockfish_2 = await Stockfish.start({
+      path: process.env.STOCKFISH_PATH,
       depth: 16,
       parameters: { MultiPV: 2, UCI_Elo: 2850, UCI_Chess960: true },
     });
     expect(await stockfish_2.get_fen_position()).toBe(
-      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1"
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1",
     );
     expect(await stockfish.get_fen_position()).toBe(
-      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     );
     await stockfish_2.get_best_move();
     await stockfish.get_best_move();
@@ -694,7 +703,7 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position("4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100");
     expect(await stockfish.get_best_move()).toBe("f1g1"); // ensures Chess960 param is False
     expect(await stockfish.get_fen_position()).toBe(
-      "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100"
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100",
     );
     expect(stockfish.info).toContain("multipv 1");
     await stockfish.update_engine_parameters({
@@ -703,23 +712,24 @@ describe("Stockfish", () => {
       UCI_Chess960: true,
     });
     expect(await stockfish.get_fen_position()).toBe(
-      "4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100"
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100",
     );
     expect(await stockfish.get_best_move()).toBe("f1h1");
     expect(stockfish.info).toContain("multipv 2");
     const updated_parameters = stockfish.get_engine_parameters();
 
-    // for key, value in updated_parameters.items():
-    //     if key == "Minimum Thinking Time":
-    //         expect(value).toBe(10
-    //     elif key==="Hash":
-    //         expect(value).toBe(32
-    //     elif key==="MultiPV":
-    //         expect(value).toBe(2
-    //     elif key==="UCI_Chess960":
-    //         expect(value).toBeTrue()
-    //     else:
-    //         expect(updated_parameters[key]).toBe(old_parameters[key]
+    for (const [key, value] of Object.entries(updated_parameters)) {
+      // if key == "Minimum Thinking Time":
+      //     expect(value).toBe(10
+      // elif key==="Hash":
+      //     expect(value).toBe(32
+      // elif key==="MultiPV":
+      //     expect(value).toBe(2
+      // elif key==="UCI_Chess960":
+      //     expect(value).toBeTrue()
+      // else:
+      //     expect(updated_parameters[key]).toBe(old_parameters[key]
+    }
 
     expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse();
     await stockfish.update_engine_parameters({
@@ -734,12 +744,12 @@ describe("Stockfish", () => {
     await stockfish.update_engine_parameters({ "Skill Level": 20 });
     expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse();
     expect(await stockfish.get_fen_position()).toBe(
-      "4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100"
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100",
     );
     await stockfish.reset_engine_parameters();
-    expect(stockfish.get_engine_parameters()).toBe(old_parameters);
+    expect(stockfish.get_engine_parameters()).toEqual(old_parameters);
     expect(await stockfish.get_fen_position()).toBe(
-      "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100"
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100",
     );
     await stockfish.update_engine_parameters({
       // @ts-expect-error ts(2353)
@@ -747,25 +757,25 @@ describe("Stockfish", () => {
     });
   });
 
-  it("test_get_top_moves", async () => {
+  it("get_top_moves", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
     await stockfish._set_option("MultiPV", 4);
     await stockfish.set_fen_position(
-      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1"
+      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1",
     );
-    expect(await stockfish.get_top_moves(2)).toBe([
+    expect(await stockfish.get_top_moves(2)).toEqual([
       { Move: "e1e8", Centipawn: null, Mate: 1 },
       { Move: "c8e8", Centipawn: null, Mate: 2 },
     ]);
     await stockfish.set_fen_position("8/8/8/8/8/3r2k1/8/6K1 w - - 0 1");
-    expect(await stockfish.get_top_moves(2)).toBe([
+    expect(await stockfish.get_top_moves(2)).toEqual([
       { Move: "g1f1", Centipawn: null, Mate: -2 },
       { Move: "g1h1", Centipawn: null, Mate: -1 },
     ]);
     stockfish.set_elo_rating(Stockfish.DEFAULT_STOCKFISH_PARAMS.UCI_Elo);
     const top_moves = await stockfish.get_top_moves(2);
-    expect(top_moves).toBe([
+    expect(top_moves).toEqual([
       { Move: "g1f1", Centipawn: null, Mate: -2 },
       { Move: "g1h1", Centipawn: null, Mate: -1 },
     ]);
@@ -776,7 +786,7 @@ describe("Stockfish", () => {
     stockfish.set_depth(10);
     await stockfish._set_option("MultiPV", 3);
     await stockfish.set_fen_position("8/8/8/8/8/6k1/8/3r2K1 w - - 0 1");
-    expect(await stockfish.get_top_moves()).toBe([]);
+    expect(await stockfish.get_top_moves()).toEqual([]);
     expect(stockfish.get_engine_parameters().MultiPV).toBe(3);
   });
 
@@ -784,16 +794,14 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
     await stockfish.set_fen_position(
-      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1"
+      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1",
     );
-    expect(await stockfish.get_top_moves(2)).toBe([
+    expect(await stockfish.get_top_moves(2)).toEqual([
       { Move: "e1e8", Centipawn: null, Mate: 1 },
       { Move: "c8e8", Centipawn: null, Mate: 2 },
     ]);
     const moves = await stockfish.get_top_moves(2, { verbose: true });
-    // expect(all(
-    //     k in moves[0]
-    //     for k).toBeOneOf([
+    // expect(all( k in moves[0] for k).toBeOneOf([
     //         "Move",
     //         "Centipawn",
     //         "Mate",e1g1
@@ -804,13 +812,13 @@ describe("Stockfish", () => {
     //         "Time",
     //     )
     // )
-    expect(moves[0]).toContainKey("WDL");
+    expect(moves[0]!).toContainKey("WDL");
   });
 
   it("get_top_moves num_nodes", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50"
+      "8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50",
     );
     const moves = await stockfish.get_top_moves(2, {
       num_nodes: 1000000,
@@ -824,24 +832,24 @@ describe("Stockfish", () => {
     await stockfish._set_option("MultiPV", 4);
     stockfish.set_num_nodes(2000000);
     await stockfish.set_fen_position(
-      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1"
+      "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1",
     );
     await stockfish.get_top_moves(2, { num_nodes: 100000 });
     expect(stockfish.get_num_nodes()).toBe(2000000);
     expect(stockfish.get_engine_parameters().MultiPV).toBe(4);
   });
 
-  it("test_get_top_moves_raises_value_error", async () => {
+  it("get_top_moves raises error", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     );
     expect(stockfish.get_top_moves(0)).rejects.toThrow("positive number");
     expect(await stockfish.get_top_moves(2)).toBeArrayOfSize(2);
     expect(stockfish.get_engine_parameters().MultiPV).toBe(1);
   });
 
-  it("test_get_perft_number_nodes", async () => {
+  it("get_perft number_nodes", async () => {
     const stockfish = await getDefaultStockfish();
     for (const [depth, expected_num_nodes] of [
       [1, 20],
@@ -849,22 +857,21 @@ describe("Stockfish", () => {
       [3, 8902],
       [6, 119060324],
     ] as const) {
-      const { num_nodes, move_possibilities } = await stockfish.get_perft(
-        depth
-      );
+      const { num_nodes, move_possibilities } =
+        await stockfish.get_perft(depth);
       expect(num_nodes).toBe(expected_num_nodes);
       expect(Object.values(move_possibilities).reduce((a, b) => a + b, 0)).toBe(
-        expected_num_nodes
+        expected_num_nodes,
       );
     }
   });
 
-  it("test_get_perft", async () => {
+  it("get_perft", async () => {
     const stockfish = await getDefaultStockfish();
     const { move_possibilities } = await stockfish.get_perft(1);
     expect(Object.keys(move_possibilities)).toBeArrayOfSize(20);
     // expect(all(k in move_possibilities.keys() for k).toBeOneOf(["a2a3", "g1h3"))
-    // expect(set(move_possibilities.values())).toEqual({1}
+    expect(new Set(Object.values(move_possibilities))).toEqual(new Set([1]));
     // move_possibilities2 = stockfish.get_perft(3)[1]
     // expect(move_possibilities.keys()).toBe(move_possibilities2.keys()
     // expect(min(move_possibilities2.values())).toBe(380
@@ -893,7 +900,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     stockfish.flip();
     expect(await stockfish.get_fen_position()).toBe(
-      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
     );
     await stockfish.set_fen_position("8/4q1k1/8/8/8/8/2K5/8 w - - 0 1");
     stockfish.flip();
@@ -909,7 +916,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
     await stockfish.set_fen_position(
-      "8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50"
+      "8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50",
     );
     expect(stockfish.get_turn_perspective()).toBeTrue();
     const moves_1 = await stockfish.get_top_moves(1);
@@ -928,21 +935,24 @@ describe("Stockfish", () => {
 
   it("turn perspective raises type error", async () => {
     const stockfish = await getDefaultStockfish();
-    expect(stockfish.set_turn_perspective("not a bool")).toThrow(TypeError);
+    // @ts-expect-error ts(2345)
+    expect(() => stockfish.set_turn_perspective("not a bool")).toThrow(
+      TypeError,
+    );
   });
 
   describe("make_moves_from_current_position", () => {
     it("valid moves", async () => {
       const stockfish = await getDefaultStockfish();
       await stockfish.set_fen_position(
-        "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1"
+        "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
       );
       const fen_1 = await stockfish.get_fen_position();
       await stockfish.make_moves_from_current_position([]);
       expect(await stockfish.get_fen_position()).toBe(fen_1);
       await stockfish.make_moves_from_current_position(["e1g1"]);
       expect(await stockfish.get_fen_position()).toBe(
-        "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 1 1"
+        "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 1 1",
       );
       await stockfish.make_moves_from_current_position([
         "f6e4",
@@ -954,7 +964,7 @@ describe("Stockfish", () => {
         "d6f5",
       ]);
       expect(await stockfish.get_fen_position()).toBe(
-        "r1bqkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNBQ1RK1 w kq - 1 5"
+        "r1bqkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNBQ1RK1 w kq - 1 5",
       );
       await stockfish.make_moves_from_current_position([
         "d1d8",
@@ -967,14 +977,14 @@ describe("Stockfish", () => {
         "f7f5",
       ]);
       expect(await stockfish.get_fen_position()).toBe(
-        "r1b1kb1r/ppp1n1pp/2p5/4Pp2/8/2N2N1P/PPP2PP1/R1BR2K1 w - f6 0 9"
+        "r1b1kb1r/ppp1n1pp/2p5/4Pp2/8/2N2N1P/PPP2PP1/R1BR2K1 w - f6 0 9",
       );
     });
 
     it("invalid moves", async () => {
       const stockfish = await getDefaultStockfish();
       await stockfish.set_fen_position(
-        "r1bqk2r/pppp1ppp/8/8/1b2n3/2N5/PPP2PPP/R1BQK2R w Qkq - 0 1"
+        "r1bqk2r/pppp1ppp/8/8/1b2n3/2N5/PPP2PPP/R1BQK2R w Qkq - 0 1",
       );
       const invalid_moves = [
         "d1e3",
@@ -987,7 +997,7 @@ describe("Stockfish", () => {
       ] as const;
       for (const invalid_move of invalid_moves) {
         expect(
-          stockfish.make_moves_from_current_position([invalid_move])
+          stockfish.make_moves_from_current_position([invalid_move]),
         ).rejects.toThrow("Cannot make move");
       }
     }, 15000);
@@ -1009,32 +1019,34 @@ describe("Stockfish", () => {
     // ----------------
 
     stockfish.set_depth(16);
-    const positions_considered = [];
+    const positions_considered: string[] = [];
     await stockfish.set_fen_position(
-      "rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2"
+      "rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2",
     );
     let total_time_calculating_first = 0.0;
 
-    // for i in range(5):
-    //     start = default_timer()
-    //     chosen_move = stockfish.get_best_move()
-    //     expect(isinstance(chosen_move, str)
-    //     total_time_calculating_first += default_timer() - start
-    //     positions_considered.append(await stockfish.get_fen_position())
-    //     stockfish.make_moves_from_current_position([chosen_move])
+    for (let i = 0; i < 5; i++) {
+      const start = Date.now();
+      const chosen_move = (await stockfish.get_best_move())!;
+      expect(chosen_move).toBeString();
+      total_time_calculating_first += Date.now() - start;
+      positions_considered.push(await stockfish.get_fen_position());
+      stockfish.make_moves_from_current_position([chosen_move]);
+    }
 
     let total_time_calculating_second = 0.0;
 
-    // for i in range(len(positions_considered)):
-    //   await stockfish.set_fen_position(positions_considered[i])
-    //     start = default_timer()
-    //     stockfish.get_best_move()
-    //     total_time_calculating_second += default_timer() - start
+    for (const position of positions_considered) {
+      await stockfish.set_fen_position(position);
+      const start = Date.now();
+      await stockfish.get_best_move();
+      total_time_calculating_second += Date.now() - start;
+    }
 
     expect(total_time_calculating_first).toBeLessThan(
-      total_time_calculating_second
+      total_time_calculating_second,
     );
-  });
+  }, 7000);
 
   it("get wdl stats", async () => {
     const stockfish = await getDefaultStockfish();
@@ -1048,27 +1060,23 @@ describe("Stockfish", () => {
     expect(wdl_stats[1]).toBeGreaterThan(wdl_stats[0] * 7);
     // expect(abs(wdl_stats[0] - wdl_stats[2]) / wdl_stats[0] < 0.15
     await stockfish.set_fen_position(
-      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     );
     const wdl_stats_2 = (await stockfish.get_wdl_stats())!;
     expect(wdl_stats_2).not.toBeNull();
     expect(wdl_stats_2).toBeArrayOfSize(3);
-    // expect(wdl_stats_2[1] > wdl_stats_2[0] * 3.5
-    // expect(wdl_stats_2[0] > wdl_stats_2[2] * 1.8
-    // await stockfish.set_fen_position("8/8/8/8/8/6k1/6p1/6K1 w - - 0 1")
-    // expect(stockfish.get_wdl_stats()).toBeNull()
+    expect(wdl_stats_2[1]).toBeGreaterThan(wdl_stats_2[0] * 3.5);
+    expect(wdl_stats_2[0]).toBeGreaterThan(wdl_stats_2[1] * 1.8);
+    await stockfish.set_fen_position("8/8/8/8/8/6k1/6p1/6K1 w - - 0 1");
+    expect(await stockfish.get_wdl_stats()).toBeNull();
     await stockfish.set_fen_position(
-      "rnbqkb1r/pp3ppp/3p1n2/1B2p3/3NP3/2N5/PPP2PPP/R1BQK2R b KQkq - 0 6"
+      "rnbqkb1r/pp3ppp/3p1n2/1B2p3/3NP3/2N5/PPP2PPP/R1BQK2R b KQkq - 0 6",
     );
-    // wdl_stats_3 = stockfish.get_wdl_stats()
-    // expect(isinstance(wdl_stats_3, list) and len(wdl_stats_3)).toBe(3
-    // stockfish._prepare_for_new_position()
-    // wdl_stats_4 = stockfish.get_wdl_stats(get_as_tuple=true)
-    // expect(isinstance(wdl_stats_4, tuple) and len(wdl_stats_4)).toBe(3
-    // expect(wdl_stats_3).toBe(list(wdl_stats_4)
-    // expect(tuple(wdl_stats_3)).toBe(wdl_stats_4
-    // await stockfish.set_fen_position("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1")
-    // expect(stockfish.get_wdl_stats()).toBeNull()
+    const wdl_stats_3 = await stockfish.get_wdl_stats();
+    expect(wdl_stats_3).not.toBeNull();
+    expect(wdl_stats_3).toBeArrayOfSize(3);
+    await stockfish.set_fen_position("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1");
+    expect(await stockfish.get_wdl_stats()).toBeNull();
   });
 
   it("multiple quit commands", async () => {
@@ -1092,7 +1100,7 @@ describe("Stockfish", () => {
   it("what is on square", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "rnbq1rk1/ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6"
+      "rnbq1rk1/ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6",
     );
 
     const squares_and_contents = {
@@ -1125,7 +1133,7 @@ describe("Stockfish", () => {
   it("13 return values from what_is_on_square", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "rnbq1rk1/ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6"
+      "rnbq1rk1/ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6",
     );
 
     const expected_enum_members = Object.values(Piece);
@@ -1144,7 +1152,7 @@ describe("Stockfish", () => {
   it("will_move_be_a_capture", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
-      "1nbq1rk1/Ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6"
+      "1nbq1rk1/Ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6",
     );
     const c3d5_result = await stockfish.will_move_be_a_capture("c3d5");
     expect(c3d5_result).toBe(Capture.DIRECT_CAPTURE);
@@ -1168,7 +1176,7 @@ describe("Stockfish", () => {
     expect(a7b8r_result).toBe(Capture.DIRECT_CAPTURE);
 
     expect(stockfish.will_move_be_a_capture("c3c5")).rejects.toThrow(
-      "not valid"
+      "not valid",
     );
   });
 
@@ -1248,7 +1256,7 @@ describe("Stockfish", () => {
     Bun.sleepSync(2000);
 
     expect(stockfish.has_quit).toBeFalse();
-    expect(stockfish.get_engine_parameters()).toBe(old_params);
+    expect(stockfish.get_engine_parameters()).toEqual(old_params);
     expect(stockfish.info).toBe(old_info);
     expect(stockfish.get_depth()).toBe(old_depth);
     expect(await stockfish.get_fen_position()).toBe(old_fen);
