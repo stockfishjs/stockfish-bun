@@ -382,9 +382,9 @@ describe("Stockfish", () => {
   it("update engine parameters wrong vals", async () => {
     const stockfish = await getDefaultStockfish();
 
-    // expect(set(stockfish.get_engine_parameters().keys()) <= set(
-    //     Stockfish._PARAM_RESTRICTIONS.keys()
-    // )
+    expect(Object.keys(stockfish.get_engine_parameters())).toEqual(
+      expect.arrayContaining(Object.keys(Stockfish._PARAM_RESTRICTIONS))
+    );
 
     const bad_values = {
       Threads: ["1", false, 0, -1, 1025, 1.0],
@@ -396,12 +396,16 @@ describe("Stockfish", () => {
       "Not key": [0],
     } as const;
 
-    // for name in bad_values:
-    //     for val in bad_values[name]:
-    //         with pytest.raises(ValueError):
-    //             stockfish.update_engine_parameters({name: val})
-    //         with pytest.raises(ValueError):
-    //         await  stockfish._set_option(name, val)
+    for (const name in bad_values) {
+      for (const val of bad_values[name as keyof typeof bad_values]) {
+        expect(
+          stockfish.update_engine_parameters({ [name]: val })
+        ).rejects.toThrow(TypeError);
+        expect(stockfish._set_option({ [name]: val })).rejects.toThrow(
+          TypeError
+        );
+      }
+    }
   });
 
   it("chess960 position", async () => {
@@ -525,12 +529,12 @@ describe("Stockfish", () => {
     );
     const evaluation = await stockfish.get_evaluation();
     expect(evaluation.type).toBe("cp");
-    expect(evaluation.value).toBeNumber();
+    expect(evaluation.value).toBeInteger();
     expect(evaluation.value).toBeGreaterThanOrEqual(60);
     expect(evaluation.value).toBeLessThanOrEqual(150);
     await stockfish.set_skill_level(1);
     expect(evaluation.type).toBe("cp");
-    expect(evaluation.value).toBeNumber();
+    expect(evaluation.value).toBeInteger();
     expect(evaluation.value).toBeGreaterThanOrEqual(60);
     expect(evaluation.value).toBeLessThanOrEqual(150);
   });
@@ -540,10 +544,11 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "r4rk1/pppb1p1p/2nbpqp1/8/3P4/3QBN2/PPP1BPPP/R4RK1 w - - 0 11"
     );
-    // start = time.time()
+    const start = Date.now();
     const evaluation = await stockfish.get_evaluation(5000);
-    // expect(round(time.time() - start)).toBe(5)
-    expect(evaluation["type"]).toBe("cp");
+    const end = Date.now();
+    expect(end - start).toBeCloseTo(5000);
+    expect(evaluation.type).toBe("cp");
     expect(evaluation.value).toBeWithin(30, 120);
   }, 7000);
 
@@ -648,40 +653,39 @@ describe("Stockfish", () => {
   it("constructor", async () => {
     const stockfish = await getDefaultStockfish();
     // Will also use a new stockfish instance in order to test sending params to the constructor.
-    // stockfish_2 = Stockfish(
-    //     depth=16, parameters={"MultiPV": 2, "UCI_Elo": 2850, "UCI_Chess960": true}
-    // )
-    // expect((
-    //     stockfish_2.get_fen_position()
-    //    ).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1"
-    // )
-    // expect((
-    //     stockfish.get_fen_position()
-    //    ).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-    // )
-    // stockfish_2.get_best_move()
-    // stockfish.get_best_move()
+    const stockfish_2 = await Stockfish.start({
+      depth: 16,
+      parameters: { MultiPV: 2, UCI_Elo: 2850, UCI_Chess960: true },
+    });
+    expect(await stockfish_2.get_fen_position()).toBe(
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1"
+    );
+    expect(await stockfish.get_fen_position()).toBe(
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
+    await stockfish_2.get_best_move();
+    await stockfish.get_best_move();
     // expect("multipv 2" in stockfish_2.info and "depth 16" in stockfish_2.info
     // expect("multipv 1" in stockfish.info and "depth 15" in stockfish.info
-    // expect(stockfish_2._depth).toBe(16)
-    // expect(stockfish._depth).toBe(15)
-    // stockfish_1_params = stockfish.get_engine_parameters()
-    // stockfish_2_params = stockfish_2.get_engine_parameters()
+    expect(stockfish_2.get_depth()).toBe(16);
+    expect(stockfish.get_depth()).toBe(15);
+    const stockfish_1_params = stockfish.get_engine_parameters();
+    const stockfish_2_params = stockfish_2.get_engine_parameters();
 
     // for key in stockfish_2_params.keys():
-    //     if key).toBe("MultiPV":
-    //         assert stockfish_2_params[key]).toBe(2 and stockfish_1_params[key]).toBe(1
-    //     elif key).toBe("UCI_Elo":
-    //         assert stockfish_2_params[key]).toBe(2850
-    //         assert stockfish_1_params[key]).toBe(1350
-    //     elif key).toBe("UCI_LimitStrength":
-    //         assert stockfish_2_params[key]).toBeTrue()
-    //         assert stockfish_1_params[key]).toBeFalse()
-    //     elif key).toBe("UCI_Chess960":
-    //         assert stockfish_2_params[key]).toBeTrue()
-    //         assert stockfish_1_params[key]).toBeFalse()
+    //     if key==="MultiPV":
+    //         expect(stockfish_2_params[key]).toBe(2 and stockfish_1_params[key]).toBe(1
+    //     elif key==="UCI_Elo":
+    //         expect(stockfish_2_params[key]).toBe(2850
+    //         expect(stockfish_1_params[key]).toBe(1350
+    //     elif key==="UCI_LimitStrength":
+    //         expect(stockfish_2_params[key]).toBeTrue()
+    //         expect(stockfish_1_params[key]).toBeFalse()
+    //     elif key==="UCI_Chess960":
+    //         expect(stockfish_2_params[key]).toBeTrue()
+    //         expect(stockfish_1_params[key]).toBeFalse()
     //     else:
-    //         assert stockfish_2_params[key]).toBe(stockfish_1_params[key]
+    //         expect(stockfish_2_params[key]).toBe(stockfish_1_params[key]
   });
 
   it("parameters functions", async () => {
@@ -694,7 +698,6 @@ describe("Stockfish", () => {
     );
     expect(stockfish.info).toContain("multipv 1");
     await stockfish.update_engine_parameters({
-      "Minimum Thinking Time": 10,
       Hash: 32,
       MultiPV: 2,
       UCI_Chess960: true,
@@ -708,31 +711,40 @@ describe("Stockfish", () => {
 
     // for key, value in updated_parameters.items():
     //     if key == "Minimum Thinking Time":
-    //         assert value).toBe(10
+    //         expect(value).toBe(10
     //     elif key==="Hash":
-    //         assert value).toBe(32
+    //         expect(value).toBe(32
     //     elif key==="MultiPV":
-    //         assert value).toBe(2
+    //         expect(value).toBe(2
     //     elif key==="UCI_Chess960":
-    //         assert value).toBeTrue()
+    //         expect(value).toBeTrue()
     //     else:
-    //         assert updated_parameters[key]).toBe(old_parameters[key]
+    //         expect(updated_parameters[key]).toBe(old_parameters[key]
 
-    // expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse()
-    // stockfish.update_engine_parameters({"UCI_Elo": 2000, "Skill Level": 19})
-    // expect(stockfish.get_engine_parameters().UCI_Elo).toBe(2000
-    // expect(stockfish.get_engine_parameters()["Skill Level"]).toBe(19
-    // expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse()
-    // stockfish.update_engine_parameters({"UCI_Elo": 2000})
-    // expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeTrue()
-    // stockfish.update_engine_parameters({"Skill Level": 20})
-    // expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse()
-    // expect(await stockfish.get_fen_position()).toBe("4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100"
-    // stockfish.reset_engine_parameters()
-    // expect(stockfish.get_engine_parameters()).toBe(old_parameters
-    // expect(await stockfish.get_fen_position()).toBe("4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100"
-    // with pytest.raises(ValueError):
-    // stockfish.update_engine_parameters({"Not an existing key", "value"})  // type: ignore
+    expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse();
+    await stockfish.update_engine_parameters({
+      UCI_Elo: 2000,
+      "Skill Level": 19,
+    });
+    expect(stockfish.get_engine_parameters().UCI_Elo).toBe(2000);
+    expect(stockfish.get_engine_parameters()["Skill Level"]).toBe(19);
+    expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse();
+    await stockfish.update_engine_parameters({ UCI_Elo: 2000 });
+    expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeTrue();
+    await stockfish.update_engine_parameters({ "Skill Level": 20 });
+    expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse();
+    expect(await stockfish.get_fen_position()).toBe(
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100"
+    );
+    await stockfish.reset_engine_parameters();
+    expect(stockfish.get_engine_parameters()).toBe(old_parameters);
+    expect(await stockfish.get_fen_position()).toBe(
+      "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100"
+    );
+    await stockfish.update_engine_parameters({
+      // @ts-expect-error ts(2353)
+      "Not an existing key": "value",
+    });
   });
 
   it("test_get_top_moves", async () => {
@@ -742,22 +754,21 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1"
     );
-    // expect(await stockfish.get_top_moves(2)).toBe([
-    //     {"Move": "e1e8", "Centipawn": null, "Mate": 1},
-    //     {"Move": "c8e8", "Centipawn": null, "Mate": 2},
-    // ])
+    expect(await stockfish.get_top_moves(2)).toBe([
+      { Move: "e1e8", Centipawn: null, Mate: 1 },
+      { Move: "c8e8", Centipawn: null, Mate: 2 },
+    ]);
     await stockfish.set_fen_position("8/8/8/8/8/3r2k1/8/6K1 w - - 0 1");
-    // expect(await stockfish.get_top_moves(2)).toBe([
-    //   {"Move": "g1f1", "Centipawn": null, "Mate": -2},
-    //   {"Move": "g1h1", "Centipawn": null, "Mate": -1},
-    // ])
-    // stockfish.set_elo_rating()
-    // with pytest.warns(UserWarning):
-    //     top_moves = await stockfish.get_top_moves(2)
-    // expect(top_moves).toBe([
-    //   {"Move": "g1f1", "Centipawn": null, "Mate": -2},
-    //   {"Move": "g1h1", "Centipawn": null, "Mate": -1},
-    // ])
+    expect(await stockfish.get_top_moves(2)).toBe([
+      { Move: "g1f1", Centipawn: null, Mate: -2 },
+      { Move: "g1h1", Centipawn: null, Mate: -1 },
+    ]);
+    stockfish.set_elo_rating(Stockfish.DEFAULT_STOCKFISH_PARAMS.UCI_Elo);
+    const top_moves = await stockfish.get_top_moves(2);
+    expect(top_moves).toBe([
+      { Move: "g1f1", Centipawn: null, Mate: -2 },
+      { Move: "g1h1", Centipawn: null, Mate: -1 },
+    ]);
   });
 
   it("get top moves mate", async () => {
@@ -775,10 +786,10 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1"
     );
-    // expect(await stockfish.get_top_moves(2, verbose=false)).toBe([
-    //     {"Move": "e1e8", "Centipawn": null, "Mate": 1},
-    //     {"Move": "c8e8", "Centipawn": null, "Mate": 2},
-    // ]
+    expect(await stockfish.get_top_moves(2)).toBe([
+      { Move: "e1e8", Centipawn: null, Mate: 1 },
+      { Move: "c8e8", Centipawn: null, Mate: 2 },
+    ]);
     const moves = await stockfish.get_top_moves(2, { verbose: true });
     // expect(all(
     //     k in moves[0]
@@ -793,11 +804,10 @@ describe("Stockfish", () => {
     //         "Time",
     //     )
     // )
-    // if stockfish.does_current_engine_version_have_wdl_option():
-    //     assert "WDL" in moves[0]
+    expect(moves[0]).toContainKey("WDL");
   });
 
-  it("test_get_top_moves_num_nodes", async () => {
+  it("get_top_moves num_nodes", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
       "8/2q2pk1/4b3/1p6/7P/Q1p3P1/2B2P2/6K1 b - - 3 50"
@@ -806,10 +816,10 @@ describe("Stockfish", () => {
       num_nodes: 1000000,
       verbose: true,
     });
-    // expect(int(moves[0]["Nodes"]) >= 1000000
+    expect(parseInt(moves[0].Nodes!)).toBeGreaterThanOrEqual(1000000);
   });
 
-  it("test_get_top_moves_preserve_globals", async () => {
+  it("get_top_moves preserve globals", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish._set_option("MultiPV", 4);
     stockfish.set_num_nodes(2000000);
@@ -826,23 +836,27 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     );
-
-    // with pytest.raises(ValueError):
-    //     stockfish.get_top_moves(0)
-
+    expect(stockfish.get_top_moves(0)).rejects.toThrow("positive number");
     expect(await stockfish.get_top_moves(2)).toBeArrayOfSize(2);
     expect(stockfish.get_engine_parameters().MultiPV).toBe(1);
   });
 
   it("test_get_perft_number_nodes", async () => {
     const stockfish = await getDefaultStockfish();
-    // @pytest.mark.parametrize(
-    //     "depth, expected_num_nodes", [(1, 20), (2, 400), (3, 8902), (6, 119060324)]
-    // )
-
-    // num_nodes, move_possibilities = stockfish.get_perft(depth)
-    // expect(num_nodes).toBe(expected_num_nodes)
-    // expect(sum(move_possibilities.values())).toBe(expected_num_nodes
+    for (const [depth, expected_num_nodes] of [
+      [1, 20],
+      [2, 400],
+      [3, 8902],
+      [6, 119060324],
+    ] as const) {
+      const { num_nodes, move_possibilities } = await stockfish.get_perft(
+        depth
+      );
+      expect(num_nodes).toBe(expected_num_nodes);
+      expect(Object.values(move_possibilities).reduce((a, b) => a + b, 0)).toBe(
+        expected_num_nodes
+      );
+    }
   });
 
   it("test_get_perft", async () => {
@@ -861,6 +875,7 @@ describe("Stockfish", () => {
   it("get perft raises type error", async () => {
     const stockfish = await getDefaultStockfish();
     for (const depth of [true, 0, "foo", 16.2]) {
+      // @ts-expect-error ts(2345)
       expect(() => stockfish.get_perft(depth)).toThrow(TypeError);
     }
   });
@@ -899,14 +914,16 @@ describe("Stockfish", () => {
     expect(stockfish.get_turn_perspective()).toBeTrue();
     const moves_1 = await stockfish.get_top_moves(1);
     expect(moves_1[0].Centipawn).toBeGreaterThan(0);
-    // eval = await stockfish.get_evaluation()["value"]
-    // expect(isinstance(eval, int) and eval > 0
+    const eval_1 = (await stockfish.get_evaluation()).value;
+    expect(eval_1).toBeInteger();
+    expect(eval_1).toBeGreaterThan(0);
     stockfish.set_turn_perspective(false);
     expect(stockfish.get_turn_perspective()).toBeFalse();
     const moves_2 = await stockfish.get_top_moves(1);
-    // expect(moves_2[0]["Centipawn"] < 0
-    // eval = await stockfish.get_evaluation()["value"]
-    // expect(isinstance(eval, int) and eval < 0
+    expect(moves_2[0].Centipawn).toBeLessThan(0);
+    const eval_2 = (await stockfish.get_evaluation()).value;
+    expect(eval_2).toBeInteger();
+    expect(eval_2).toBeLessThan(0);
   });
 
   it("turn perspective raises type error", async () => {
@@ -914,50 +931,66 @@ describe("Stockfish", () => {
     expect(stockfish.set_turn_perspective("not a bool")).toThrow(TypeError);
   });
 
-  it("make_moves_from_current_position", async () => {
-    const stockfish = await getDefaultStockfish();
-    await stockfish.set_fen_position(
-      "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1"
-    );
-    const fen_1 = await stockfish.get_fen_position();
-    await stockfish.make_moves_from_current_position([]);
-    expect(await stockfish.get_fen_position()).toBe(fen_1);
-    await stockfish.make_moves_from_current_position(["e1g1"]);
-    expect(await stockfish.get_fen_position()).toBe(
-      "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 1 1"
-    );
-    await stockfish.make_moves_from_current_position([
-      "f6e4",
-      "d2d4",
-      "e4d6",
-      "b5c6",
-      "d7c6",
-      "d4e5",
-      "d6f5",
-    ]);
-    expect(await stockfish.get_fen_position()).toBe(
-      "r1bqkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNBQ1RK1 w kq - 1 5"
-    );
-    await stockfish.make_moves_from_current_position([
-      "d1d8",
-      "e8d8",
-      "b1c3",
-      "d8e8",
-      "f1d1",
-      "f5e7",
-      "h2h3",
-      "f7f5",
-    ]);
-    expect(await stockfish.get_fen_position()).toBe(
-      "r1b1kb1r/ppp1n1pp/2p5/4Pp2/8/2N2N1P/PPP2PP1/R1BR2K1 w - f6 0 9"
-    );
-    await stockfish.set_fen_position(
-      "r1bqk2r/pppp1ppp/8/8/1b2n3/2N5/PPP2PPP/R1BQK2R w Qkq - 0 1"
-    );
-    // invalid_moves = ["d1e3", "e1g1", "c3d5", "c1d4", "a7a6", "e1d2", "word"]
-    // for invalid_move in invalid_moves:
-    //     with pytest.raises(ValueError):
-    //         stockfish.make_moves_from_current_position([invalid_move])
+  describe("make_moves_from_current_position", () => {
+    it("valid moves", async () => {
+      const stockfish = await getDefaultStockfish();
+      await stockfish.set_fen_position(
+        "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1"
+      );
+      const fen_1 = await stockfish.get_fen_position();
+      await stockfish.make_moves_from_current_position([]);
+      expect(await stockfish.get_fen_position()).toBe(fen_1);
+      await stockfish.make_moves_from_current_position(["e1g1"]);
+      expect(await stockfish.get_fen_position()).toBe(
+        "r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 1 1"
+      );
+      await stockfish.make_moves_from_current_position([
+        "f6e4",
+        "d2d4",
+        "e4d6",
+        "b5c6",
+        "d7c6",
+        "d4e5",
+        "d6f5",
+      ]);
+      expect(await stockfish.get_fen_position()).toBe(
+        "r1bqkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNBQ1RK1 w kq - 1 5"
+      );
+      await stockfish.make_moves_from_current_position([
+        "d1d8",
+        "e8d8",
+        "b1c3",
+        "d8e8",
+        "f1d1",
+        "f5e7",
+        "h2h3",
+        "f7f5",
+      ]);
+      expect(await stockfish.get_fen_position()).toBe(
+        "r1b1kb1r/ppp1n1pp/2p5/4Pp2/8/2N2N1P/PPP2PP1/R1BR2K1 w - f6 0 9"
+      );
+    });
+
+    it("invalid moves", async () => {
+      const stockfish = await getDefaultStockfish();
+      await stockfish.set_fen_position(
+        "r1bqk2r/pppp1ppp/8/8/1b2n3/2N5/PPP2PPP/R1BQK2R w Qkq - 0 1"
+      );
+      const invalid_moves = [
+        "d1e3",
+        "e1g1",
+        "c3d5",
+        "c1d4",
+        "a7a6",
+        "e1d2",
+        "word",
+      ] as const;
+      for (const invalid_move of invalid_moves) {
+        expect(
+          stockfish.make_moves_from_current_position([invalid_move])
+        ).rejects.toThrow("Cannot make move");
+      }
+    }, 15000);
   });
 
   it("make_moves transposition table speed", async () => {
@@ -980,17 +1013,17 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position(
       "rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2"
     );
-    // total_time_calculating_first = 0.0
+    let total_time_calculating_first = 0.0;
 
     // for i in range(5):
     //     start = default_timer()
     //     chosen_move = stockfish.get_best_move()
-    //     assert isinstance(chosen_move, str)
+    //     expect(isinstance(chosen_move, str)
     //     total_time_calculating_first += default_timer() - start
     //     positions_considered.append(await stockfish.get_fen_position())
     //     stockfish.make_moves_from_current_position([chosen_move])
 
-    // total_time_calculating_second = 0.0
+    let total_time_calculating_second = 0.0;
 
     // for i in range(len(positions_considered)):
     //   await stockfish.set_fen_position(positions_considered[i])
@@ -998,60 +1031,62 @@ describe("Stockfish", () => {
     //     stockfish.get_best_move()
     //     total_time_calculating_second += default_timer() - start
 
-    // expect(total_time_calculating_first < total_time_calculating_second
+    expect(total_time_calculating_first).toBeLessThan(
+      total_time_calculating_second
+    );
   });
 
   it("get wdl stats", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
     await stockfish._set_option("MultiPV", 2);
-    expect(stockfish.get_wdl_stats()).not.rejects.toThrow();
-    // await stockfish.set_fen_position("7k/4R3/4P1pp/7N/8/8/1q5q/3K4 w - - 0 1")
-    //   wdl_stats = stockfish.get_wdl_stats()
-    //   assert isinstance(wdl_stats, list)
-    //   assert wdl_stats[1] > wdl_stats[0] * 7
-    //   assert abs(wdl_stats[0] - wdl_stats[2]) / wdl_stats[0] < 0.15
-    // await stockfish.set_fen_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-    //   wdl_stats_2 = stockfish.get_wdl_stats()
-    //   assert isinstance(wdl_stats_2, list)
-    //   assert wdl_stats_2[1] > wdl_stats_2[0] * 3.5
-    //   assert wdl_stats_2[0] > wdl_stats_2[2] * 1.8
+    expect(stockfish.get_wdl_stats()).not.rejects.toThrow("unsupported");
+    await stockfish.set_fen_position("7k/4R3/4P1pp/7N/8/8/1q5q/3K4 w - - 0 1");
+    const wdl_stats = (await stockfish.get_wdl_stats())!;
+    expect(wdl_stats).not.toBeNull();
+    expect(wdl_stats).toBeArrayOfSize(3);
+    expect(wdl_stats[1]).toBeGreaterThan(wdl_stats[0] * 7);
+    // expect(abs(wdl_stats[0] - wdl_stats[2]) / wdl_stats[0] < 0.15
+    await stockfish.set_fen_position(
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
+    const wdl_stats_2 = (await stockfish.get_wdl_stats())!;
+    expect(wdl_stats_2).not.toBeNull();
+    expect(wdl_stats_2).toBeArrayOfSize(3);
+    // expect(wdl_stats_2[1] > wdl_stats_2[0] * 3.5
+    // expect(wdl_stats_2[0] > wdl_stats_2[2] * 1.8
     // await stockfish.set_fen_position("8/8/8/8/8/6k1/6p1/6K1 w - - 0 1")
-    //   assert stockfish.get_wdl_stats()).toBeNull()
-    // await stockfish.set_fen_position(
-    //       "rnbqkb1r/pp3ppp/3p1n2/1B2p3/3NP3/2N5/PPP2PPP/R1BQK2R b KQkq - 0 6"
-    //   )
-    //   wdl_stats_3 = stockfish.get_wdl_stats()
-    //   assert isinstance(wdl_stats_3, list) and len(wdl_stats_3)).toBe(3
-    //   stockfish._prepare_for_new_position()
-    //   wdl_stats_4 = stockfish.get_wdl_stats(get_as_tuple=true)
-    //   assert isinstance(wdl_stats_4, tuple) and len(wdl_stats_4)).toBe(3
-    //   assert wdl_stats_3).toBe(list(wdl_stats_4)
-    //   assert tuple(wdl_stats_3)).toBe(wdl_stats_4
+    // expect(stockfish.get_wdl_stats()).toBeNull()
+    await stockfish.set_fen_position(
+      "rnbqkb1r/pp3ppp/3p1n2/1B2p3/3NP3/2N5/PPP2PPP/R1BQK2R b KQkq - 0 6"
+    );
+    // wdl_stats_3 = stockfish.get_wdl_stats()
+    // expect(isinstance(wdl_stats_3, list) and len(wdl_stats_3)).toBe(3
+    // stockfish._prepare_for_new_position()
+    // wdl_stats_4 = stockfish.get_wdl_stats(get_as_tuple=true)
+    // expect(isinstance(wdl_stats_4, tuple) and len(wdl_stats_4)).toBe(3
+    // expect(wdl_stats_3).toBe(list(wdl_stats_4)
+    // expect(tuple(wdl_stats_3)).toBe(wdl_stats_4
     // await stockfish.set_fen_position("8/8/8/8/8/3k4/3p4/3K4 w - - 0 1")
-    //   assert stockfish.get_wdl_stats()).toBeNull()
-    //   stockfish.set_skill_level(1)
-    //   with pytest.warns(UserWarning):
-    //       stockfish.get_wdl_stats()
+    // expect(stockfish.get_wdl_stats()).toBeNull()
   });
 
   it("multiple quit commands", async () => {
     const stockfish = await getDefaultStockfish();
-    // Test multiple quit commands, and include a call to del too. All of
-    // them should run without causing some Exception.
+    // Test multiple quit commands, and include a call to del too.
+    // All of them should run without causing some Error.
     expect(stockfish.has_quit).toBeFalse();
-    // expect(not stockfish._has_quit_command_been_sent
-    stockfish._put("quit");
-    // expect(stockfish._has_quit_command_been_sent
-    stockfish._put("quit");
-    // expect(stockfish._has_quit_command_been_sent
-    // stockfish.__del__()
-    // expect(stockfish._stockfish.exitCode).not.toBeNull()
-    // expect(stockfish._has_quit_command_been_sent
-    // stockfish._put(f"go depth {10}")
+    expect(stockfish._has_quit_command_been_sent).toBeFalse();
+    await stockfish.quit_stockfish();
+    expect(stockfish._has_quit_command_been_sent).toBeTrue();
+    await stockfish.quit_stockfish();
+    expect(stockfish._has_quit_command_been_sent).toBeTrue();
+    expect(stockfish.has_quit).toBeTrue();
+    expect(stockfish._has_quit_command_been_sent).toBeTrue();
+    stockfish._put(`go depth 10`);
     // Should do nothing, and change neither of the values below.
-    // expect(stockfish._stockfish.exitCode).not.toBeNull()
-    // expect(stockfish._has_quit_command_been_sent
+    expect(stockfish.has_quit).toBeTrue();
+    expect(stockfish._has_quit_command_been_sent).toBeTrue();
   });
 
   it("what is on square", async () => {
@@ -1079,14 +1114,12 @@ describe("Stockfish", () => {
       d8: Piece.BLACK_QUEEN,
     };
 
-    // for notation, piece in squares_and_contents.items():
-    //     assert stockfish.get_what_is_on_square(notation) is piece
+    for (const [square, piece] of Object.entries(squares_and_contents)) {
+      expect(await stockfish.get_what_is_on_square(square)).toBe(piece);
+    }
 
-    // with pytest.raises(ValueError):
-    //     stockfish.get_what_is_on_square("i1")
-
-    // with pytest.raises(ValueError):
-    //     stockfish.get_what_is_on_square("b9")
+    expect(stockfish.get_what_is_on_square("i1")).rejects.toThrow("argument");
+    expect(stockfish.get_what_is_on_square("b9")).rejects.toThrow("argument");
   });
 
   it("13 return values from what_is_on_square", async () => {
@@ -1095,31 +1128,20 @@ describe("Stockfish", () => {
       "rnbq1rk1/ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6"
     );
 
-    // expected_enum_members = [
-    //     "WHITE_PAWN",
-    //     "BLACK_PAWN",
-    //     "WHITE_KNIGHT",
-    //     "BLACK_KNIGHT",
-    //     "WHITE_BISHOP",
-    //     "BLACK_BISHOP",
-    //     "WHITE_ROOK",
-    //     "BLACK_ROOK",
-    //     "WHITE_QUEEN",
-    //     "BLACK_QUEEN",
-    //     "WHITE_KING",
-    //     "BLACK_KING",
-    // ]
+    const expected_enum_members = Object.values(Piece);
 
-    // rows = ["a", "b", "c", "d", "e", "f", "g", "h"]
-    // cols = ["1", "2", "3", "4", "5", "6", "7", "8"]
+    const rows = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+    const cols = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 
-    // for row in rows:
-    //     for col in cols:
-    //         val = stockfish.get_what_is_on_square(row + col)
-    //         assert val).toBeNull() or val.name in expected_enum_members
+    for (const row of rows) {
+      for (const col of cols) {
+        const val = await stockfish.get_what_is_on_square(`${row}${col}`);
+        expect(val).toBeOneOf([null, ...expected_enum_members]);
+      }
+    }
   });
 
-  it("test_will_move_be_a_capture", async () => {
+  it("will_move_be_a_capture", async () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position(
       "1nbq1rk1/Ppp1ppbp/5np1/3pP3/8/BPN5/P1PP1PPP/R2QKBNR w KQ d6 0 6"
@@ -1128,55 +1150,26 @@ describe("Stockfish", () => {
     expect(c3d5_result).toBe(Capture.DIRECT_CAPTURE);
 
     const e5d6_result = await stockfish.will_move_be_a_capture("e5d6");
-    // expect(
-    //     e5d6_result is Capture.EN_PASSANT
-    //     and e5d6_result.name).toBe("EN_PASSANT"
-    //     and e5d6_result.value).toBe("en passant"
-    // )
-    // f1e2_result = await stockfish.will_move_be_a_capture("f1e2")
-    // expect(
-    //     f1e2_result is Capture.NO_CAPTURE
-    //     and f1e2_result.name).toBe("NO_CAPTURE"
-    //     and f1e2_result.value).toBe("no capture"
-    // )
-    // e5f6_result = await stockfish.will_move_be_a_capture("e5f6")
-    // expect(
-    //     e5f6_result is Capture.DIRECT_CAPTURE
-    //     and e5f6_result.name).toBe("DIRECT_CAPTURE"
-    //     and e5f6_result.value).toBe("direct capture"
-    // )
-    // a3d6_result = await stockfish.will_move_be_a_capture("a3d6")
-    // expect(
-    //     a3d6_result is Capture.NO_CAPTURE
-    //     and a3d6_result.name).toBe("NO_CAPTURE"
-    //     and a3d6_result.value).toBe("no capture"
-    // )
-    // a7a8q_result = await stockfish.will_move_be_a_capture("a7a8q")
-    // expect(
-    //     a7a8q_result is Capture.NO_CAPTURE
-    //     and a7a8q_result.name).toBe("NO_CAPTURE"
-    //     and a7a8q_result.value).toBe("no capture"
-    // )
-    // a7a8b_result = await stockfish.will_move_be_a_capture("a7a8b")
-    // expect((
-    //     a7a8b_result is Capture.NO_CAPTURE
-    //     and a7a8b_result.name).toBe("NO_CAPTURE"
-    //     and a7a8b_result.value).toBe("no capture"
-    // )
-    // a7b8q_result = await stockfish.will_move_be_a_capture("a7b8q")
-    // expect((
-    //     a7b8q_result is Capture.DIRECT_CAPTURE
-    //     and a7b8q_result.name).toBe("DIRECT_CAPTURE"
-    //     and a7b8q_result.value).toBe("direct capture"
-    // )
-    // a7b8r_result = await stockfish.will_move_be_a_capture("a7b8r")
-    // expect(
-    //     a7b8r_result is Capture.DIRECT_CAPTURE
-    //     and a7b8r_result.name).toBe("DIRECT_CAPTURE"
-    //     and a7b8r_result.value).toBe("direct capture"
-    // )
-    // with pytest.raises(ValueError):
-    //     stockfish.will_move_be_a_capture("c3c5")
+    expect(e5d6_result).toBe(Capture.EN_PASSANT);
+
+    const f1e2_result = await stockfish.will_move_be_a_capture("f1e2");
+    expect(f1e2_result).toBe(Capture.NO_CAPTURE);
+    const e5f6_result = await stockfish.will_move_be_a_capture("e5f6");
+    expect(e5f6_result).toBe(Capture.DIRECT_CAPTURE);
+    const a3d6_result = await stockfish.will_move_be_a_capture("a3d6");
+    expect(a3d6_result).toBe(Capture.NO_CAPTURE);
+    const a7a8q_result = await stockfish.will_move_be_a_capture("a7a8q");
+    expect(a7a8q_result).toBe(Capture.NO_CAPTURE);
+    const a7a8b_result = await stockfish.will_move_be_a_capture("a7a8b");
+    expect(a7a8b_result).toBe(Capture.NO_CAPTURE);
+    const a7b8q_result = await stockfish.will_move_be_a_capture("a7b8q");
+    expect(a7b8q_result).toBe(Capture.DIRECT_CAPTURE);
+    const a7b8r_result = await stockfish.will_move_be_a_capture("a7b8r");
+    expect(a7b8r_result).toBe(Capture.DIRECT_CAPTURE);
+
+    expect(stockfish.will_move_be_a_capture("c3c5")).rejects.toThrow(
+      "not valid"
+    );
   });
 
   describe("invalid fen king attacked", async () => {
@@ -1242,15 +1235,15 @@ describe("Stockfish", () => {
       "4k3/8/4K3/8/8/8/8/8 w - - 99 ee",
     ] as const;
 
-    // correct_fens.extend([null] * (len(invalid_syntax_fens) - len(correct_fens)))
-    // expect((correct_fens.length)).toBe((invalid_syntax_fens.length))
+    for (const correct_fen of correct_fens) {
+      expect(Stockfish.is_fen_syntax_valid(correct_fen)).toBeTrue();
+      expect(await stockfish.is_fen_valid(correct_fen)).toBeTrue();
+    }
 
-    // for correct_fen, invalid_syntax_fen in zip(correct_fens, invalid_syntax_fens):
-    //     if correct_fen !== null:
-    //         assert stockfish.is_fen_valid(correct_fen)
-    //         assert stockfish._is_fen_syntax_valid(correct_fen)
-    //     assert not stockfish.is_fen_valid(invalid_syntax_fen)
-    //     assert not stockfish._is_fen_syntax_valid(invalid_syntax_fen)
+    for (const invalid_syntax_fen of invalid_syntax_fens) {
+      expect(Stockfish.is_fen_syntax_valid(invalid_syntax_fen)).toBeFalse();
+      expect(await stockfish.is_fen_valid(invalid_syntax_fen)).toBeFalse();
+    }
 
     Bun.sleepSync(2000);
 

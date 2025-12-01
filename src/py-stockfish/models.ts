@@ -36,25 +36,19 @@ export enum Capture {
 
 interface StockfishParameters {
   readonly "Debug Log File": string;
-  readonly Contempt: number;
-  readonly "Min Split Depth": number;
   readonly Threads: number;
   readonly Ponder: boolean;
   readonly Hash: number;
   readonly MultiPV: number;
   readonly "Skill Level": number;
   readonly "Move Overhead": number;
-  readonly "Minimum Thinking Time": number;
   readonly UCI_Chess960: boolean;
   readonly UCI_LimitStrength: boolean;
   readonly UCI_Elo: number;
-}
-
-interface StockfishParametersWithWDL extends StockfishParameters {
   readonly UCI_ShowWDL: boolean;
 }
 
-type StockfishParametersKey = keyof StockfishParametersWithWDL;
+type StockfishParametersKey = keyof StockfishParameters;
 
 /**
  * https://official-stockfish.github.io/docs/stockfish-wiki/UCI-&-Commands
@@ -73,13 +67,11 @@ type UCICommand =
  * Integrates the [Stockfish chess engine](https://stockfishchess.org) with Typescript.
  */
 export class Stockfish {
-  private readonly _RELEASES = {
+  private static readonly _RELEASES = {
     "17.1": "2025-03-30",
     "17.0": "2024-09-06",
     "16.1": "2024-02-24",
     "16.0": "2023-06-30",
-    "15.1": "2022-12-04",
-    "15.0": "2022-04-18",
   } as const;
 
   private static readonly _PIECE_CHARS = [
@@ -100,7 +92,7 @@ export class Stockfish {
   /**
    * `_PARAM_RESTRICTIONS` stores the types of each of the params, and any applicable min and max values, based off the Stockfish source code
    *
-   * https://github.com/official-stockfish/Stockfish/blob/154abb337e8737aedd6def4e7c0ca18bd4737252/src/ucioption.cpp#L68-L85
+   * https://github.com/official-stockfish/Stockfish/blob/c12dbdedd9366bc7ffb29b355038bc7dea5f9c48/src/engine.cpp#L63-L138
    */
   private static readonly _PARAM_RESTRICTIONS = {
     "Debug Log File": ["string", null, null],
@@ -113,9 +105,6 @@ export class Stockfish {
     UCI_Chess960: ["boolean", null, null],
     UCI_LimitStrength: ["boolean", null, null],
     UCI_Elo: ["number", 1320, 3190],
-    Contempt: ["number", -100, 100],
-    "Min Split Depth": ["number", 0, 12],
-    "Minimum Thinking Time": ["number", 0, 5000],
     UCI_ShowWDL: ["boolean", null, null],
   } as const satisfies Record<
     StockfishParametersKey,
@@ -124,18 +113,16 @@ export class Stockfish {
 
   public static readonly DEFAULT_STOCKFISH_PARAMS = {
     "Debug Log File": "",
-    Contempt: 0,
-    "Min Split Depth": 0,
     Threads: 1,
     Ponder: false,
     Hash: 16,
     MultiPV: 1,
     "Skill Level": 20,
     "Move Overhead": 10,
-    "Minimum Thinking Time": 20,
     UCI_Chess960: false,
     UCI_LimitStrength: false,
     UCI_Elo: 1350,
+    UCI_ShowWDL: false,
   } as const satisfies StockfishParameters;
 
   private _path!: string;
@@ -143,8 +130,8 @@ export class Stockfish {
   private info: string = "";
   private _parameters: Partial<StockfishParameters> = {};
   private _stockfish!: Bun.Subprocess<"pipe", "pipe", "pipe">;
-  private _stdoutReader!: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
-  private _lineBuffer: string = "";
+  #stdoutReader!: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
+  #lineBuffer: string = "";
 
   public static readonly DEFAULT_NUM_NODES = 1000000 as const;
   public static readonly DEFAULT_DEPTH = 15 as const;
@@ -157,7 +144,7 @@ export class Stockfish {
   private _depth: number = Stockfish.DEFAULT_DEPTH;
   private _turn_perspective: boolean = Stockfish.DEFAULT_TURN_PERSPECTIVE;
 
-  private _version: {
+  private _version!: {
     major: number;
     minor: number;
     patch: string;
@@ -203,11 +190,12 @@ export class Stockfish {
       stdout: "pipe",
       stderr: "pipe",
     });
-    stockfish._stdoutReader = stockfish._stockfish.stdout.getReader();
+    stockfish.#stdoutReader = stockfish._stockfish.stdout.getReader();
 
     stockfish._has_quit_command_been_sent = false;
     await stockfish._set_stockfish_version();
     stockfish._put("uci");
+    await stockfish._discard_remaining_stdout_lines("uciok");
     stockfish.set_depth(depth);
     stockfish.set_num_nodes(num_nodes);
     stockfish.set_turn_perspective(turn_perspective);
@@ -215,7 +203,9 @@ export class Stockfish {
       Stockfish.DEFAULT_STOCKFISH_PARAMS
     );
     await stockfish.update_engine_parameters(parameters);
-    if (!(await stockfish._does_current_engine_version_have_wdl_option())) {
+    const does_current_engine_version_have_wdl_option =
+      await stockfish._does_current_engine_version_have_wdl_option();
+    if (!does_current_engine_version_have_wdl_option) {
       throw new Error(
         `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
 This means that you are using an unsupported version of Stockfish.`
@@ -329,47 +319,54 @@ This means that you are using an unsupported version of Stockfish.`
     }
   }
 
-  private async _read_line(): Promise<string> {
+  async #readline(): Promise<string> {
     if (!this._stockfish.stdout) {
       throw new BrokenPipeError();
     }
     if (this.has_quit) {
-      throw new StockfishError();
+      throw new StockfishError("The Stockfish process has crashed", "crashed");
     }
     while (true) {
-      const newlineIndex = this._lineBuffer.indexOf("\n");
+      // console.debug({ _lineBuffer: this._lineBuffer });
+      const newlineIndex = this.#lineBuffer.indexOf("\n");
       if (newlineIndex >= 0) {
-        const line = this._lineBuffer.slice(0, newlineIndex).trim();
-        this._lineBuffer = this._lineBuffer.slice(newlineIndex + 1);
+        const line = this.#lineBuffer.slice(0, newlineIndex).trim();
+        this.#lineBuffer = this.#lineBuffer.slice(newlineIndex + 1);
         // console.debug({ line });
         if (line.length === 0) continue;
         return line;
       }
-      const readerPromise = this._stdoutReader.read();
+      const readerPromise = this.#stdoutReader.read();
       const exitPromise = this._stockfish.exited.then(() => {
-        throw new StockfishError();
+        throw new StockfishError(
+          "The Stockfish process has crashed",
+          "crashed"
+        );
       });
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new StockfishError("Read Timeout")), 2000)
+        setTimeout(() => {
+          reject(new StockfishError("Read Timeout", "readtimeout"));
+        }, 5000)
       );
-      // console.debug("Waiting for _stdoutReader");
+      // console.debug("Waiting for readerPromise...");
       const { value, done } = await Promise.race([
         readerPromise,
         exitPromise,
         timeoutPromise,
       ]);
+      // console.debug("readerPromise done");
       if (done) {
-        if (this._lineBuffer.length > 0) {
-          const line = this._lineBuffer.trim();
-          this._lineBuffer = "";
+        if (this.#lineBuffer.length > 0) {
+          const line = this.#lineBuffer.trim();
+          this.#lineBuffer = "";
           // console.debug({ line });
           if (line.length === 0) continue;
           return line;
         }
         if (this._has_quit_command_been_sent) return "";
-        throw new StockfishError("Stream ended unexpectedly");
+        throw new StockfishError("Stream ended unexpectedly", "streamended");
       }
-      this._lineBuffer += new TextDecoder().decode(value, { stream: true });
+      this.#lineBuffer += new TextDecoder().decode(value, { stream: true });
     }
   }
 
@@ -379,12 +376,12 @@ This means that you are using an unsupported version of Stockfish.`
   private async _discard_remaining_stdout_lines(
     substr_in_last_line: string
   ): Promise<void> {
-    while (!(await this._read_line()).includes(substr_in_last_line));
+    while (!(await this.#readline()).includes(substr_in_last_line));
   }
 
-  private async _set_option<T extends keyof StockfishParametersWithWDL>(
+  private async _set_option<T extends keyof StockfishParameters>(
     name: T,
-    value: StockfishParametersWithWDL[T],
+    value: StockfishParameters[T],
     update_parameters_attribute: boolean = true
   ): Promise<void> {
     this._validate_param_val(name, value);
@@ -396,9 +393,9 @@ This means that you are using an unsupported version of Stockfish.`
     await this._is_ready();
   }
 
-  private _validate_param_val<T extends keyof StockfishParametersWithWDL>(
+  private _validate_param_val<T extends keyof StockfishParameters>(
     name: T,
-    value: StockfishParametersWithWDL[T]
+    value: StockfishParameters[T]
   ): void {
     if (!(name in Stockfish._PARAM_RESTRICTIONS)) {
       throw new Error(`${name} is not a supported engine parameter`);
@@ -425,7 +422,7 @@ This means that you are using an unsupported version of Stockfish.`
   private async _is_ready(): Promise<void> {
     this._put("isready");
     while (true) {
-      const line = await this._read_line();
+      const line = await this.#readline();
       if (line === "readyok") return;
     }
   }
@@ -507,9 +504,13 @@ This means that you are using an unsupported version of Stockfish.`
    */
   async make_moves_from_current_position(moves?: string[]): Promise<void> {
     if (!moves?.length) return;
+    // console.debug({ moves });
     await this._prepare_for_new_position(false);
     for (const move of moves) {
-      if (!(await this.is_move_correct(move))) {
+      // console.debug({ move });
+      const is_move_correct = await this.is_move_correct(move);
+      // console.debug({ move, is_move_correct });
+      if (!is_move_correct) {
         throw new Error(`Cannot make move: ${move}`);
       }
       const fen_position = await this.get_fen_position();
@@ -552,7 +553,7 @@ This means that you are using an unsupported version of Stockfish.`
     const board_rep_lines: string[] = [];
     let count_lines: number = 0;
     while (count_lines < 17) {
-      const board_str: string = await this._read_line();
+      const board_str: string = await this.#readline();
       if (board_str.includes("+") || board_str.includes("|")) {
         count_lines += 1;
         if (perspective_white) {
@@ -574,7 +575,7 @@ This means that you are using an unsupported version of Stockfish.`
       board_rep_lines.reverse();
     }
 
-    const board_str = await this._read_line();
+    const board_str = await this.#readline();
 
     if (perspective_white) {
       board_rep_lines.push(`  ${board_str}`);
@@ -597,7 +598,7 @@ This means that you are using an unsupported version of Stockfish.`
   async get_fen_position(): Promise<string> {
     this._put("d");
     while (true) {
-      const text = await this._read_line();
+      const text = await this.#readline();
       const splitted_text = text.split(/\s+/);
       if (splitted_text[0] === "Fen:") {
         await this._discard_remaining_stdout_lines("Checkers");
@@ -611,7 +612,7 @@ This means that you are using an unsupported version of Stockfish.`
    *
    * @param skill_level Skill Level option between 0 (weakest level) and 20 (full strength)
    */
-  async set_skill_level(skill_level: number = 20): Promise<void> {
+  async set_skill_level(skill_level: number): Promise<void> {
     await this.update_engine_parameters({
       UCI_LimitStrength: false,
       "Skill Level": skill_level,
@@ -623,7 +624,7 @@ This means that you are using an unsupported version of Stockfish.`
    *
    * @param elo_rating Aim for an engine strength of the given Elo
    */
-  async set_elo_rating(elo_rating: number = 1350): Promise<void> {
+  async set_elo_rating(elo_rating: number): Promise<void> {
     await this.update_engine_parameters({
       UCI_LimitStrength: true,
       UCI_Elo: elo_rating,
@@ -744,10 +745,9 @@ This means that you are using an unsupported version of Stockfish.`
   private async _get_sf_go_command_output(): Promise<string[]> {
     const lines: string[] = [];
     while (true) {
-      lines.push(await this._read_line());
-      // console.debug("_get_sf_go_command_output", { lines });
+      lines.push(await this.#readline());
       // The "bestmove" line is the last line of the output.
-      if (lines.at(-1).startsWith("bestmove")) {
+      if (lines.at(-1)?.startsWith("bestmove")) {
         return lines;
       }
     }
@@ -768,8 +768,9 @@ This means that you are using an unsupported version of Stockfish.`
 
     if (
       fen_fields.length !== 6 ||
-      fen_fields[0].split("/").length !== 8
-      // any(x not in fen_fields[0] for x in "Kk")||
+      fen_fields[0]!.split("/").length !== 8 ||
+      !fen_fields[0]!.includes("K") ||
+      !fen_fields[0]!.includes("k")
       // any(not fen_fields[x].isdigit() for x in (4, 5))||
       // int(fen_fields[4]) >= int(fen_fields[5]) * 2
     ) {
@@ -843,8 +844,11 @@ This means that you are using an unsupported version of Stockfish.`
   async is_move_correct(move_value: string): Promise<boolean> {
     const old_self_info = this.info;
     this._put(`go depth 1 searchmoves ${move_value}`);
+    // console.debug("in is_move_correct, after go");
     const best_move = await this._get_best_move_from_sf_popen_process();
+    // console.debug("in is_move_correct, after best_move", { best_move });
     const is_move_correct = best_move === move_value;
+    // console.debug({ is_move_correct, best_move, move_value });
     this.info = old_self_info;
     return is_move_correct;
   }
@@ -854,7 +858,7 @@ This means that you are using an unsupported version of Stockfish.`
    *
    * @returns A tuple of three integers, unless the game is over, in which case `null` is returned.
    */
-  async get_wdl_stats() {
+  async get_wdl_stats(): Promise<readonly [number, number, number] | null> {
     if (!(await this._does_current_engine_version_have_wdl_option())) {
       throw new Error(
         `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
@@ -899,7 +903,7 @@ This means that you are using an unsupported version of Stockfish.`
   private async _does_current_engine_version_have_wdl_option(): Promise<boolean> {
     this._put("uci");
     while (true) {
-      const splitted_text = (await this._read_line()).split(/\s+/);
+      const splitted_text = (await this.#readline()).split(/\s+/);
       if (splitted_text[0] === "uciok") {
         return false;
       } else if (splitted_text.includes("UCI_ShowWDL")) {
@@ -966,7 +970,7 @@ This means that you are using an unsupported version of Stockfish.`
     this._put("eval");
 
     while (true) {
-      const text = await this._read_line();
+      const text = await this.#readline();
       if (
         text.includes("Final evaluation") ||
         text.includes("Total evaluation")
@@ -1005,7 +1009,7 @@ This means that you are using an unsupported version of Stockfish.`
     const { verbose = false, num_nodes = 0 } = { ...options };
 
     if (num_top_moves <= 0) {
-      throw new Error("num_top_moves mus be a positive number.");
+      throw new Error("num_top_moves must be a positive number.");
     }
 
     if (this._on_weaker_setting()) {
@@ -1070,7 +1074,7 @@ This means that you are using an unsupported version of Stockfish.`
       // if we are searching depth and the line is not our desired depth, we are done
       if (
         num_nodes === 0 &&
-        parseInt(this._pick(line, "depth")) !== this._depth
+        parseInt(this.#pick(line, "depth")) !== this._depth
       ) {
         break;
       }
@@ -1078,38 +1082,43 @@ This means that you are using an unsupported version of Stockfish.`
       // if we are searching nodes and the line has less than desired number of nodes, we are done
       if (
         num_nodes > 0 &&
-        parseInt(this._pick(line, "nodes")) < this._num_nodes
+        parseInt(this.#pick(line, "nodes")) < this._num_nodes
       ) {
         break;
       }
 
       const move_evaluation: MoveEvaluation = {
         // get move
-        Move: this._pick(line, "pv"),
+        Move: this.#pick(line, "pv"),
         // get cp if available
         Centipawn: line.includes("cp")
-          ? parseInt(this._pick(line, "cp")) * perspective
+          ? parseInt(this.#pick(line, "cp")) * perspective
           : null,
         Mate: line.includes("mate")
-          ? parseInt(this._pick(line, "mate")) * perspective
+          ? parseInt(this.#pick(line, "mate")) * perspective
           : null,
       };
 
       // add more info if verbose
       if (verbose) {
-        move_evaluation.Time = this._pick(line, "time");
-        move_evaluation.Nodes = this._pick(line, "nodes");
-        move_evaluation.MultiPVLine = this._pick(line, "multipv");
-        move_evaluation.NodesPerSecond = this._pick(line, "nps");
-        move_evaluation.SelectiveDepth = this._pick(line, "seldepth");
-
-        // move_evaluation["WDL"] = " ".join(
-        //     [
-        //         this._pick(line, "wdl", 1),
-        //         this._pick(line, "wdl", 2),
-        //         this._pick(line, "wdl", 3),
-        //     ][::perspective]
-        // )
+        move_evaluation.Time = this.#pick(line, "time");
+        move_evaluation.Nodes = this.#pick(line, "nodes");
+        move_evaluation.MultiPVLine = this.#pick(line, "multipv");
+        move_evaluation.NodesPerSecond = this.#pick(line, "nps");
+        move_evaluation.SelectiveDepth = this.#pick(line, "seldepth");
+        move_evaluation.WDL = (
+          perspective > 0
+            ? [
+                this.#pick(line, "wdl", 1),
+                this.#pick(line, "wdl", 2),
+                this.#pick(line, "wdl", 3),
+              ]
+            : [
+                this.#pick(line, "wdl", 3),
+                this.#pick(line, "wdl", 2),
+                this.#pick(line, "wdl", 1),
+              ]
+        ).join(" ");
       }
 
       // add move to list of top moves
@@ -1147,18 +1156,18 @@ This means that you are using an unsupported version of Stockfish.`
     const move_possibilities: Record<string, number> = {};
     let num_nodes = 0;
     while (true) {
-      const line = await this._read_line();
+      const line = await this.#readline();
       if (line.includes("searched")) {
-        num_nodes = parseInt(line.split(":")[1]);
+        num_nodes = parseInt(line.split(":")[1]!);
         break;
       }
 
       const [move, num] = line.split(":");
-      if (Object.keys(move_possibilities).includes(move)) {
+      if (Object.keys(move_possibilities).includes(move!)) {
         throw new Error("assert move not in move_possibilities");
       }
 
-      move_possibilities[move] = parseInt(num);
+      move_possibilities[move!] = parseInt(num!);
     }
     return { num_nodes, move_possibilities } as const;
   }
@@ -1170,8 +1179,8 @@ This means that you are using an unsupported version of Stockfish.`
     this._put("flip");
   }
 
-  private _pick(line: string[], value: string = "", index: number = 1): string {
-    return line[line.indexOf(value) + index];
+  #pick(line: string[], value: string = "", index: number = 1): string {
+    return line[line.indexOf(value) + index]!;
   }
 
   /**
@@ -1182,15 +1191,20 @@ This means that you are using an unsupported version of Stockfish.`
    * @returns object if the square is empty.
    */
   async get_what_is_on_square(square: string): Promise<Piece | null> {
-    const file_letter: string = square[0].toLowerCase();
-    const rank_num: number = parseInt(square[1]);
+    if (square.length !== 2) {
+      throw new Error(
+        "square argument to the get_what_is_on_square function isn't valid."
+      );
+    }
+
+    const file_letter: string = square[0]!.toLowerCase();
+    const rank_num: number = parseInt(square[1]!);
 
     if (
-      square.length !== 2 ||
       file_letter < "a" ||
       file_letter > "h" ||
-      square[1] < "1" ||
-      square[1] > "8"
+      square[1]! < "1" ||
+      square[1]! > "8"
     ) {
       throw new Error(
         "square argument to the get_what_is_on_square function isn't valid."
@@ -1199,11 +1213,11 @@ This means that you are using an unsupported version of Stockfish.`
 
     const rank_visual: string = (await this.get_board_visual()).split(/\r?\n/)[
       17 - 2 * rank_num
-    ];
+    ]!;
 
-    const ord = (c: string): number => [...c][0].codePointAt(0);
+    const ord = (c: string): number => [...c][0]!.codePointAt(0)!;
     const piece_as_char: string =
-      rank_visual[2 + (ord(file_letter) - ord("a")) * 4];
+      rank_visual[2 + (ord(file_letter) - ord("a")) * 4]!;
 
     if (piece_as_char === " ") return null;
 
@@ -1237,7 +1251,7 @@ This means that you are using an unsupported version of Stockfish.`
       }
 
       // Check for Chess960 castling:
-      const castling_pieces = [
+      const castling_pieces = <(Piece | null)[][]>[
         [Piece.WHITE_KING, Piece.WHITE_ROOK],
         [Piece.BLACK_KING, Piece.BLACK_ROOK],
       ];
@@ -1254,7 +1268,9 @@ This means that you are using an unsupported version of Stockfish.`
     if (
       move_value.slice(2, 4) ===
         (await this.get_fen_position()).split(/\s+/)[3] &&
-      [Piece.WHITE_PAWN, Piece.BLACK_PAWN].includes(starting_square_piece)
+      (<(Piece | null)[]>[Piece.WHITE_PAWN, Piece.BLACK_PAWN]).includes(
+        starting_square_piece
+      )
     ) {
       return Capture.EN_PASSANT;
     }
@@ -1303,7 +1319,7 @@ This means that you are using an unsupported version of Stockfish.`
     this._put("uci");
     // read version text:
     while (true) {
-      const line = await this._read_line();
+      const line = await this.#readline();
       if (line.startsWith("id name")) {
         await this._discard_remaining_stdout_lines("uciok");
         this._parse_stockfish_version(line.split(/\s+/)[3]);
@@ -1326,10 +1342,10 @@ This means that you are using an unsupported version of Stockfish.`
       if (this._version.text.startsWith("dev-")) {
         this._version.is_dev_build = true;
         // parse patch and sha from dev version text
-        this._version.patch = this._version.text.split("-")[1];
-        this._version.sha = this._version.text.split("-")[2];
+        this._version.patch = this._version.text.split("-")[1]!;
+        this._version.sha = this._version.text.split("-")[2]!;
         // get major.minor version as text from build date
-        const build_date = this._version.text.split("-")[1];
+        const build_date = this._version.text.split("-")[1]!;
         const date_string = `${parseInt(build_date.slice(0, 4))}-${parseInt(
           build_date.slice(4, 6)
         )}-${parseInt(build_date.slice(6, 8))}`;
@@ -1353,10 +1369,10 @@ This means that you are using an unsupported version of Stockfish.`
       }
 
       // parse version number for all versions
-      this._version.major = parseInt(this._version.text.split(".")[0]);
+      this._version.major = parseInt(this._version.text.split(".")[0]!);
 
       try {
-        this._version.minor = parseInt(this._version.text.split(".")[1]);
+        this._version.minor = parseInt(this._version.text.split(".")[1]!);
       } catch {
         this._version.minor = 0;
       }
@@ -1375,7 +1391,7 @@ This means that you are using an unsupported version of Stockfish.`
     const date_object = new Date(date_string);
     // Convert release date strings to datetime objects
     const releases_datetime = Object.fromEntries(
-      Object.entries(this._RELEASES).map(([key, value]) => [
+      Object.entries(Stockfish._RELEASES).map(([key, value]) => [
         key,
         new Date(value),
       ])
@@ -1385,7 +1401,7 @@ This means that you are using an unsupported version of Stockfish.`
     let key_for_date = null;
     for (const [key, value] of Object.entries(releases_datetime)) {
       if (value <= date_object) {
-        if (key_for_date === null || value > releases_datetime[key_for_date]) {
+        if (key_for_date === null || value > releases_datetime[key_for_date]!) {
           key_for_date = key;
         }
       }
@@ -1428,14 +1444,19 @@ interface MoveEvaluation {
   MultiPVLine?: string;
   NodesPerSecond?: string;
   SelectiveDepth?: string;
-  WDL?: [string, string, string];
+  WDL?: string;
 }
 
 export class StockfishError extends Error {
   override readonly name = "StockfishError";
+  readonly reason: "crashed" | "readtimeout" | "streamended";
 
-  constructor(message = "The Stockfish process has crashed") {
+  constructor(
+    message: string,
+    reason: "crashed" | "readtimeout" | "streamended"
+  ) {
     super(message);
+    this.reason = reason;
   }
 }
 
