@@ -920,14 +920,14 @@ describe("Stockfish", () => {
     );
     expect(stockfish.get_turn_perspective()).toBeTrue();
     const moves_1 = await stockfish.get_top_moves(1);
-    expect(moves_1[0].Centipawn).toBeGreaterThan(0);
+    expect(moves_1[0]?.Centipawn).toBeGreaterThan(0);
     const eval_1 = (await stockfish.get_evaluation()).value;
     expect(eval_1).toBeInteger();
     expect(eval_1).toBeGreaterThan(0);
     stockfish.set_turn_perspective(false);
     expect(stockfish.get_turn_perspective()).toBeFalse();
     const moves_2 = await stockfish.get_top_moves(1);
-    expect(moves_2[0].Centipawn).toBeLessThan(0);
+    expect(moves_2[0]?.Centipawn).toBeLessThan(0);
     const eval_2 = (await stockfish.get_evaluation()).value;
     expect(eval_2).toBeInteger();
     expect(eval_2).toBeLessThan(0);

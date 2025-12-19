@@ -125,11 +125,13 @@ export class Stockfish {
     UCI_ShowWDL: false,
   } as const satisfies StockfishParameters;
 
+  private info: string = "";
+
   private _path!: string;
   private _has_quit_command_been_sent!: boolean;
-  private info: string = "";
   private _parameters: Partial<StockfishParameters> = {};
-  private _stockfish!: Bun.Subprocess<"pipe", "pipe", "pipe">;
+
+  #stockfish!: Bun.Subprocess<"pipe", "pipe", "pipe">;
   #stdoutReader!: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
   #lineBuffer: string = "";
 
@@ -184,18 +186,18 @@ export class Stockfish {
 
     stockfish._path = path;
 
-    stockfish._stockfish = Bun.spawn({
+    stockfish.#stockfish = Bun.spawn({
       cmd: [path],
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
     });
-    stockfish.#stdoutReader = stockfish._stockfish.stdout.getReader();
+    stockfish.#stdoutReader = stockfish.#stockfish.stdout.getReader();
 
     stockfish._has_quit_command_been_sent = false;
     await stockfish._set_stockfish_version();
-    stockfish._put("uci");
-    await stockfish._discard_remaining_stdout_lines("uciok");
+    stockfish.#put("uci");
+    await stockfish.#discard_remaining_stdout_lines("uciok");
     stockfish.set_depth(depth);
     stockfish.set_num_nodes(num_nodes);
     stockfish.set_turn_perspective(turn_perspective);
@@ -213,7 +215,7 @@ This means that you are using an unsupported version of Stockfish.`,
     }
     await stockfish._set_option("UCI_ShowWDL", true, false);
 
-    await stockfish._prepare_for_new_position(true);
+    await stockfish.#prepare_for_new_position(true);
     return stockfish;
   }
 
@@ -242,7 +244,7 @@ This means that you are using an unsupported version of Stockfish.`,
         throw new Error(`'${key}' is not a key that exists.`);
       }
 
-      this._validate_param_val(key, new_param_values[key]);
+      this.#validate_param_value(key, new_param_values[key]);
     }
 
     if (
@@ -289,20 +291,20 @@ This means that you are using an unsupported version of Stockfish.`,
     await this.update_engine_parameters(Stockfish.DEFAULT_STOCKFISH_PARAMS);
   }
 
-  private async _prepare_for_new_position(
+  async #prepare_for_new_position(
     send_ucinewgame_token: boolean = true,
   ): Promise<void> {
     if (send_ucinewgame_token) {
-      this._put("ucinewgame");
+      this.#put("ucinewgame");
     }
-    await this._is_ready();
+    await this.#isReady();
     this.info = "";
   }
 
-  private _put(command: UCICommand): void {
+  #put(command: UCICommand): void {
     // console.debug({ command });
 
-    if (!this._stockfish.stdin) {
+    if (!this.#stockfish.stdin) {
       throw new BrokenPipeError();
     }
 
@@ -311,8 +313,8 @@ This means that you are using an unsupported version of Stockfish.`,
     }
 
     if (!this._has_quit_command_been_sent) {
-      this._stockfish.stdin.write(`${command}\n`);
-      this._stockfish.stdin.flush();
+      this.#stockfish.stdin.write(`${command}\n`);
+      this.#stockfish.stdin.flush();
       if (command === "quit") {
         this._has_quit_command_been_sent = true;
       }
@@ -320,7 +322,7 @@ This means that you are using an unsupported version of Stockfish.`,
   }
 
   async #readline(): Promise<string> {
-    if (!this._stockfish.stdout) {
+    if (!this.#stockfish.stdout) {
       throw new BrokenPipeError();
     }
     if (this.has_quit) {
@@ -337,7 +339,7 @@ This means that you are using an unsupported version of Stockfish.`,
         return line;
       }
       const readerPromise = this.#stdoutReader.read();
-      const exitPromise = this._stockfish.exited.then(() => {
+      const exitPromise = this.#stockfish.exited.then(() => {
         throw new StockfishError(
           "The Stockfish process has crashed",
           "crashed",
@@ -371,9 +373,9 @@ This means that you are using an unsupported version of Stockfish.`,
   }
 
   /**
-   * Calls `_read_line()` until encountering `substr_in_last_line` in the line.
+   * Calls `#readline()` until encountering `substr_in_last_line` in the line.
    */
-  private async _discard_remaining_stdout_lines(
+  async #discard_remaining_stdout_lines(
     substr_in_last_line: string,
   ): Promise<void> {
     while (!(await this.#readline()).includes(substr_in_last_line));
@@ -384,16 +386,16 @@ This means that you are using an unsupported version of Stockfish.`,
     value: StockfishParameters[T],
     update_parameters_attribute: boolean = true,
   ): Promise<void> {
-    this._validate_param_val(name, value);
+    this.#validate_param_value(name, value);
     const str_rep_value = String(value);
-    this._put(`setoption name ${name} value ${str_rep_value}`);
+    this.#put(`setoption name ${name} value ${str_rep_value}`);
     if (update_parameters_attribute) {
       Object.assign(this._parameters, { [name]: value });
     }
-    await this._is_ready();
+    await this.#isReady();
   }
 
-  private _validate_param_val<T extends keyof StockfishParameters>(
+  #validate_param_value<T extends keyof StockfishParameters>(
     name: T,
     value: StockfishParameters[T],
   ): void {
@@ -419,27 +421,27 @@ This means that you are using an unsupported version of Stockfish.`,
     }
   }
 
-  private async _is_ready(): Promise<void> {
-    this._put("isready");
+  private async #isReady(): Promise<void> {
+    this.#put("isready");
     while (true) {
       const line = await this.#readline();
       if (line === "readyok") return;
     }
   }
 
-  private _go(): void {
-    this._put(`go depth ${this._depth}`);
+  #go(): void {
+    this.#put(`go depth ${this._depth}`);
   }
 
-  private _go_nodes(): void {
-    this._put(`go nodes ${this._num_nodes}`);
+  #go_nodes(): void {
+    this.#put(`go nodes ${this._num_nodes}`);
   }
 
-  private _go_time(time: number): void {
-    this._put(`go movetime ${time}`);
+  #go_time(time: number): void {
+    this.#put(`go movetime ${time}`);
   }
 
-  private _go_remaining_time(wtime?: number, btime?: number): void {
+  #go_remaining_time(wtime?: number, btime?: number): void {
     let cmd = "go";
     if (wtime !== undefined) {
       cmd += ` wtime ${wtime}`;
@@ -447,11 +449,11 @@ This means that you are using an unsupported version of Stockfish.`,
     if (btime !== undefined) {
       cmd += ` btime ${btime}`;
     }
-    this._put(cmd);
+    this.#put(cmd);
   }
 
-  private _go_perft(depth: number): void {
-    this._put(`go perft ${depth}`);
+  #go_perft(depth: number): void {
+    this.#put(`go perft ${depth}`);
   }
 
   private _on_weaker_setting(): boolean {
@@ -463,7 +465,7 @@ This means that you are using an unsupported version of Stockfish.`,
   /**
    * Will issue a warning, referring to the function that calls this one.
    */
-  private _weaker_setting_warning(message: string): void {
+  #weaker_setting_warning(message: string): void {
     console.warn(
       `Note that even though you've set Stockfish to play on a weaker elo or skill level, ${message}`,
     );
@@ -483,8 +485,8 @@ This means that you are using an unsupported version of Stockfish.`,
     send_ucinewgame_token: boolean = true,
   ): Promise<void> {
     // console.debug({ fen_position });
-    await this._prepare_for_new_position(send_ucinewgame_token);
-    this._put(`position fen ${fen_position}`);
+    await this.#prepare_for_new_position(send_ucinewgame_token);
+    this.#put(`position fen ${fen_position}`);
   }
 
   /**
@@ -505,7 +507,7 @@ This means that you are using an unsupported version of Stockfish.`,
   async make_moves_from_current_position(moves?: string[]): Promise<void> {
     if (!moves?.length) return;
     // console.debug({ moves });
-    await this._prepare_for_new_position(false);
+    await this.#prepare_for_new_position(false);
     for (const move of moves) {
       // console.debug({ move });
       const is_move_correct = await this.is_move_correct(move);
@@ -515,7 +517,7 @@ This means that you are using an unsupported version of Stockfish.`,
       }
       const fen_position = await this.get_fen_position();
       // console.debug({ fen_position });
-      this._put(`position fen ${fen_position} moves ${move}`);
+      this.#put(`position fen ${fen_position} moves ${move}`);
     }
   }
 
@@ -549,7 +551,7 @@ This means that you are using an unsupported version of Stockfish.`,
    * ```
    */
   async get_board_visual(perspective_white: boolean = true): Promise<string> {
-    this._put("d");
+    this.#put("d");
     const board_rep_lines: string[] = [];
     let count_lines: number = 0;
     while (count_lines < 17) {
@@ -585,7 +587,7 @@ This means that you are using an unsupported version of Stockfish.`,
     }
 
     // "Checkers" is in the last line outputted by Stockfish for the "d" command.
-    await this._discard_remaining_stdout_lines("Checkers");
+    await this.#discard_remaining_stdout_lines("Checkers");
     const board_rep = board_rep_lines.join("\n") + "\n";
     return board_rep;
   }
@@ -596,12 +598,12 @@ This means that you are using an unsupported version of Stockfish.`,
    * @returns String of current board position in Forsyth-Edwards notation (FEN). For example: `"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"`
    */
   async get_fen_position(): Promise<string> {
-    this._put("d");
+    this.#put("d");
     while (true) {
       const text = await this.#readline();
       const splitted_text = text.split(/\s+/);
       if (splitted_text[0] === "Fen:") {
-        await this._discard_remaining_stdout_lines("Checkers");
+        await this.#discard_remaining_stdout_lines("Checkers");
         return splitted_text.slice(1).join(" ");
       }
     }
@@ -706,11 +708,11 @@ This means that you are using an unsupported version of Stockfish.`,
   async get_best_move(options?: { wtime?: number; btime?: number }) {
     const { wtime, btime } = { ...options };
     if (wtime !== undefined || btime !== undefined) {
-      this._go_remaining_time(wtime, btime);
+      this.#go_remaining_time(wtime, btime);
     } else {
-      this._go();
+      this.#go();
     }
-    return this._get_best_move_from_sf_popen_process();
+    return this.#get_best_move_from_sf_popen_process();
   }
 
   /**
@@ -721,16 +723,16 @@ This means that you are using an unsupported version of Stockfish.`,
    * @returns A string of move in algebraic notation, or `null` if it's a mate now.
    */
   async get_best_move_time(time: number = 1000): Promise<string | null> {
-    this._go_time(time);
-    return this._get_best_move_from_sf_popen_process();
+    this.#go_time(time);
+    return this.#get_best_move_from_sf_popen_process();
   }
 
   /**
    * Precondition - a "go" command must have been sent to SF before calling this function.
    * This function needs existing output to read from the SF popen process.
    */
-  private async _get_best_move_from_sf_popen_process(): Promise<string | null> {
-    const lines: string[] = await this._get_sf_go_command_output();
+  async #get_best_move_from_sf_popen_process(): Promise<string | null> {
+    const lines: string[] = await this.#get_sf_go_command_output();
     // console.debug({ lines });
     this.info = lines.at(-2);
     const last_line_split = lines.at(-1).split(/\s+/);
@@ -745,7 +747,7 @@ This means that you are using an unsupported version of Stockfish.`,
    *
    * A list of strings is returned, where each string represents a line of output.
    */
-  private async _get_sf_go_command_output(): Promise<string[]> {
+  async #get_sf_go_command_output(): Promise<string[]> {
     const lines: string[] = [];
     while (true) {
       lines.push(await this.#readline());
@@ -823,8 +825,8 @@ This means that you are using an unsupported version of Stockfish.`,
 
     await temp_sf.set_fen_position(fen, false);
     try {
-      temp_sf._put("go depth 10");
-      const best_move = await temp_sf._get_best_move_from_sf_popen_process();
+      temp_sf.#put("go depth 10");
+      const best_move = await temp_sf.#get_best_move_from_sf_popen_process();
       // console.debug({ best_move });
       return best_move !== null;
     } catch (e) {
@@ -847,9 +849,9 @@ This means that you are using an unsupported version of Stockfish.`,
    */
   async is_move_correct(move_value: string): Promise<boolean> {
     const old_self_info = this.info;
-    this._put(`go depth 1 searchmoves ${move_value}`);
+    this.#put(`go depth 1 searchmoves ${move_value}`);
     // console.debug("in is_move_correct, after go");
-    const best_move = await this._get_best_move_from_sf_popen_process();
+    const best_move = await this.#get_best_move_from_sf_popen_process();
     // console.debug("in is_move_correct, after best_move", { best_move });
     const is_move_correct = best_move === move_value;
     // console.debug({ is_move_correct, best_move, move_value });
@@ -871,13 +873,13 @@ This means that you are using an unsupported version of Stockfish.`,
     }
 
     if (this._on_weaker_setting()) {
-      this._weaker_setting_warning(
+      this.#weaker_setting_warning(
         "get_wdl_stats will still return full strength Stockfish's wdl stats of the position.",
       );
     }
 
-    this._go();
-    const lines = await this._get_sf_go_command_output();
+    this.#go();
+    const lines = await this.#get_sf_go_command_output();
 
     if (lines.at(-1)?.startsWith("bestmove (none)")) {
       return null;
@@ -905,13 +907,13 @@ This means that you are using an unsupported version of Stockfish.`,
    * @returns `true` if Stockfish has the `WDL` option, otherwise `false`.
    */
   private async _does_current_engine_version_have_wdl_option(): Promise<boolean> {
-    this._put("uci");
+    this.#put("uci");
     while (true) {
       const splitted_text = (await this.#readline()).split(/\s+/);
       if (splitted_text[0] === "uciok") {
         return false;
       } else if (splitted_text.includes("UCI_ShowWDL")) {
-        await this._discard_remaining_stdout_lines("uciok");
+        await this.#discard_remaining_stdout_lines("uciok");
         return true;
       }
     }
@@ -927,7 +929,7 @@ This means that you are using an unsupported version of Stockfish.`,
    */
   async get_evaluation(searchtime?: number) {
     if (this._on_weaker_setting()) {
-      this._weaker_setting_warning(
+      this.#weaker_setting_warning(
         "get_evaluation will still return full strength Stockfish's evaluation of the position.",
       );
     }
@@ -941,12 +943,12 @@ This means that you are using an unsupported version of Stockfish.`,
         : -1;
 
     if (!searchtime) {
-      this._go();
+      this.#go();
     } else {
-      this._go_time(searchtime);
+      this.#go_time(searchtime);
     }
 
-    const lines = await this._get_sf_go_command_output();
+    const lines = await this.#get_sf_go_command_output();
     // console.debug({ lines });
     const split_line = lines
       .filter((line) => line.startsWith("info"))
@@ -971,7 +973,7 @@ This means that you are using an unsupported version of Stockfish.`,
         ? 1
         : -1;
 
-    this._put("eval");
+    this.#put("eval");
 
     while (true) {
       const text = await this.#readline();
@@ -1017,7 +1019,7 @@ This means that you are using an unsupported version of Stockfish.`,
     }
 
     if (this._on_weaker_setting()) {
-      this._weaker_setting_warning(
+      this.#weaker_setting_warning(
         "get_top_moves will still return the top moves of full strength Stockfish.",
       );
     }
@@ -1035,13 +1037,13 @@ This means that you are using an unsupported version of Stockfish.`,
 
     // start engine. will go until reaches `this._depth` or `this._num_nodes`
     if (num_nodes === 0) {
-      this._go();
+      this.#go();
     } else {
       this._num_nodes = num_nodes;
-      this._go_nodes();
+      this.#go_nodes();
     }
 
-    const lines = (await this._get_sf_go_command_output()).map((line) =>
+    const lines = (await this.#get_sf_go_command_output()).map((line) =>
       line.trim().split(/\s+/),
     );
 
@@ -1155,7 +1157,7 @@ This means that you are using an unsupported version of Stockfish.`,
       throw new TypeError("depth must be an integer higher than 0");
     }
 
-    this._go_perft(depth);
+    this.#go_perft(depth);
 
     const move_possibilities: Record<string, number> = {};
     let num_nodes = 0;
@@ -1181,7 +1183,7 @@ This means that you are using an unsupported version of Stockfish.`,
    * Flip the side to move
    */
   flip(): void {
-    this._put("flip");
+    this.#put("flip");
   }
 
   #pick(line: string[], value: string = "", index: number = 1): string {
@@ -1321,19 +1323,19 @@ This means that you are using an unsupported version of Stockfish.`,
   }
 
   private async _set_stockfish_version(): Promise<void> {
-    this._put("uci");
+    this.#put("uci");
     // read version text:
     while (true) {
       const line = await this.#readline();
       if (line.startsWith("id name")) {
-        await this._discard_remaining_stdout_lines("uciok");
-        this._parse_stockfish_version(line.split(/\s+/)[3]);
+        await this.#discard_remaining_stdout_lines("uciok");
+        this.#parse_stockfish_version(line.split(/\s+/)[3]);
         return;
       }
     }
   }
 
-  private _parse_stockfish_version(version_text: string = ""): void {
+  #parse_stockfish_version(version_text: string = ""): void {
     try {
       this._version = {
         major: 0,
@@ -1426,17 +1428,17 @@ This means that you are using an unsupported version of Stockfish.`,
    */
   async quit_stockfish(): Promise<void> {
     if (this.has_quit) return;
-    this._put("quit");
-    await this._stockfish.exited;
+    this.#put("quit");
+    await this.#stockfish.exited;
   }
 
   get has_quit(): boolean {
-    return this._stockfish.exitCode !== null;
+    return this.#stockfish.exitCode !== null;
   }
 
   async kill_stockfish(): Promise<void> {
-    this._stockfish.kill();
-    await this._stockfish.exited;
+    this.#stockfish.kill();
+    await this.#stockfish.exited;
   }
 }
 

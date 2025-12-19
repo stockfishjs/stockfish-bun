@@ -1,11 +1,11 @@
-# stockfish-native
+# @stockfish/node
 
 > UCI interface for native Stockfish
 
 ## Installation
 
 ```bash
-npm install stockfish-native
+bun add @stockfish/node
 ```
 
 Download or build the [Stockfish](https://stockfishchess.org/download/) engine from source.
@@ -13,7 +13,7 @@ If necessary, mark the binary as executable.
 
 ## Usage
 
-`stockfish-native` provides methods thinly wrapping the UCI commands supported by the stockfish engine.
+`@stockfish/node` provides methods thinly wrapping the UCI commands supported by the stockfish engine.
 For better type checking, the results and options are explicitly typed and parsed instead unlike the strings UCI operates on.
 
 Most operations are asynchronous and return a promise. If a command is sent before the previous command has been returned, it will be queued and run after the previous commands complete.
@@ -21,7 +21,7 @@ Most operations are asynchronous and return a promise. If a command is sent befo
 ### Create an engine instance
 
 ```ts
-import Stockfish from "stockfish-native";
+import Stockfish from "@stockfish/node";
 
 const engine = new Stockfish("/path/to/engine", options);
 ```
@@ -134,30 +134,4 @@ Immediately kill the engine.
 
 ## TypeScript
 
-`stockfish-native` is written in TypeScript - no types install!
-
-## Development
-
-### Available Scripts
-
-In the project directory, you can run:
-
-#### `npm run build`
-
-Builds the package using typescript into `./lib`
-
-#### `npm test`
-
-Launches the Jest to run tests.
-
-#### `npm run lint`
-
-Checks code for style issues and syntax errors with TSLint and Prettier.
-
-#### `npm run lint:fix`
-
-Checks code for style issues and syntax errors with TSLint and Prettier, attempting to fix them when possible.
-
-### Publishing a new version
-
-Travis is configured to run deploys on tags.
+`@stockfish/node` is written in TypeScript - no types install!
