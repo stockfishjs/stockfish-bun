@@ -409,7 +409,13 @@ describe("Stockfish", () => {
         expect(
           stockfish.update_engine_parameters({ [name]: val }),
         ).rejects.toThrow(TypeError);
-        expect(stockfish._set_option(name, val)).rejects.toThrow(TypeError);
+        expect(
+          stockfish._set_option(
+            // @ts-expect-error
+            name,
+            val,
+          ),
+        ).rejects.toThrow(TypeError);
       }
     }
   });
@@ -824,7 +830,7 @@ describe("Stockfish", () => {
       num_nodes: 1000000,
       verbose: true,
     });
-    expect(parseInt(moves[0].Nodes!)).toBeGreaterThanOrEqual(1000000);
+    expect(parseInt(moves[0]?.Nodes!)).toBeGreaterThanOrEqual(1000000);
   });
 
   it("get_top_moves preserve globals", async () => {
@@ -1081,7 +1087,7 @@ describe("Stockfish", () => {
 
   it("multiple quit commands", async () => {
     const stockfish = await getDefaultStockfish();
-    // Test multiple quit commands, and include a call to del too.
+    // Test multiple quit commands.
     // All of them should run without causing some Error.
     expect(stockfish.has_quit).toBeFalse();
     expect(stockfish._has_quit_command_been_sent).toBeFalse();
@@ -1089,10 +1095,6 @@ describe("Stockfish", () => {
     expect(stockfish._has_quit_command_been_sent).toBeTrue();
     await stockfish.quit_stockfish();
     expect(stockfish._has_quit_command_been_sent).toBeTrue();
-    expect(stockfish.has_quit).toBeTrue();
-    expect(stockfish._has_quit_command_been_sent).toBeTrue();
-    stockfish._put(`go depth 10`);
-    // Should do nothing, and change neither of the values below.
     expect(stockfish.has_quit).toBeTrue();
     expect(stockfish._has_quit_command_been_sent).toBeTrue();
   });

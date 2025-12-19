@@ -127,10 +127,10 @@ export class Stockfish {
 
   private info: string = "";
 
-  private _path!: string;
-  private _has_quit_command_been_sent!: boolean;
-  private _parameters: Partial<StockfishParameters> = {};
+  private _has_quit_command_been_sent: boolean = false;
+  private _parameters: StockfishParameters = Stockfish.DEFAULT_STOCKFISH_PARAMS;
 
+  #path!: string;
   #stockfish!: Bun.Subprocess<"pipe", "pipe", "pipe">;
   #stdoutReader!: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
   #lineBuffer: string = "";
@@ -184,7 +184,7 @@ export class Stockfish {
       turn_perspective = true,
     } = { ...options };
 
-    stockfish._path = path;
+    stockfish.#path = path;
 
     stockfish.#stockfish = Bun.spawn({
       cmd: [path],
@@ -194,19 +194,16 @@ export class Stockfish {
     });
     stockfish.#stdoutReader = stockfish.#stockfish.stdout.getReader();
 
-    stockfish._has_quit_command_been_sent = false;
-    await stockfish._set_stockfish_version();
+    await stockfish.#set_stockfish_version();
     stockfish.#put("uci");
     await stockfish.#discard_remaining_stdout_lines("uciok");
     stockfish.set_depth(depth);
     stockfish.set_num_nodes(num_nodes);
     stockfish.set_turn_perspective(turn_perspective);
-    await stockfish.update_engine_parameters(
-      Stockfish.DEFAULT_STOCKFISH_PARAMS,
-    );
+    await stockfish.reset_engine_parameters();
     await stockfish.update_engine_parameters(parameters);
     const does_current_engine_version_have_wdl_option =
-      await stockfish._does_current_engine_version_have_wdl_option();
+      await stockfish.#does_current_engine_version_have_wdl_option();
     if (!does_current_engine_version_have_wdl_option) {
       throw new Error(
         `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
@@ -421,7 +418,7 @@ This means that you are using an unsupported version of Stockfish.`,
     }
   }
 
-  private async #isReady(): Promise<void> {
+  async #isReady(): Promise<void> {
     this.#put("isready");
     while (true) {
       const line = await this.#readline();
@@ -783,7 +780,7 @@ This means that you are using an unsupported version of Stockfish.`,
       return false;
     }
 
-    for (const fenPart of fen_fields[0].split("/")) {
+    for (const fenPart of fen_fields[0]!.split("/")) {
       let field_sum: number = 0;
       let previous_was_digit: boolean = false;
       for (const c of fenPart) {
@@ -793,7 +790,7 @@ This means that you are using an unsupported version of Stockfish.`,
           }
           field_sum += parseInt(c);
           previous_was_digit = true;
-        } else if (Stockfish._PIECE_CHARS.includes(c)) {
+        } else if ((<readonly string[]>Stockfish._PIECE_CHARS).includes(c)) {
           field_sum += 1;
           previous_was_digit = false;
         } else {
@@ -819,7 +816,7 @@ This means that you are using an unsupported version of Stockfish.`,
 
     // Using a new temporary SF instance, in case the fen is an illegal position that causes the SF process to crash.
     const temp_sf = await Stockfish.start({
-      path: this._path,
+      path: this.#path,
       parameters: { Hash: 1 },
     });
 
@@ -865,7 +862,7 @@ This means that you are using an unsupported version of Stockfish.`,
    * @returns A tuple of three integers, unless the game is over, in which case `null` is returned.
    */
   async get_wdl_stats(): Promise<readonly [number, number, number] | null> {
-    if (!(await this._does_current_engine_version_have_wdl_option())) {
+    if (!(await this.#does_current_engine_version_have_wdl_option())) {
       throw new Error(
         `Your version of Stockfish isn't recent enough to have the UCI_ShowWDL option.\
 This means that you are using an unsupported version of Stockfish.`,
@@ -887,7 +884,7 @@ This means that you are using an unsupported version of Stockfish.`,
 
     const split_line = lines
       .filter((line) => line.includes(" multipv 1 "))
-      .at(-1)
+      .at(-1)!
       .split(/\s+/);
 
     const wdl_index = split_line.indexOf("wdl");
@@ -906,7 +903,7 @@ This means that you are using an unsupported version of Stockfish.`,
    *
    * @returns `true` if Stockfish has the `WDL` option, otherwise `false`.
    */
-  private async _does_current_engine_version_have_wdl_option(): Promise<boolean> {
+  async #does_current_engine_version_have_wdl_option(): Promise<boolean> {
     this.#put("uci");
     while (true) {
       const splitted_text = (await this.#readline()).split(/\s+/);
@@ -952,7 +949,7 @@ This means that you are using an unsupported version of Stockfish.`,
     // console.debug({ lines });
     const split_line = lines
       .filter((line) => line.startsWith("info"))
-      .at(-1)
+      .at(-1)!
       .split(/\s+/);
     const score_index = split_line.indexOf("score");
     const eval_type = split_line[score_index + 1];
@@ -1322,7 +1319,7 @@ This means that you are using an unsupported version of Stockfish.`,
     return this._version.is_dev_build;
   }
 
-  private async _set_stockfish_version(): Promise<void> {
+  async #set_stockfish_version(): Promise<void> {
     this.#put("uci");
     // read version text:
     while (true) {
