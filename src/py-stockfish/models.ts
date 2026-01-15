@@ -111,7 +111,7 @@ export class Stockfish {
     ["number", number, number] | ["string" | "boolean", null, null]
   >;
 
-  public static readonly DEFAULT_STOCKFISH_PARAMS = {
+  public static readonly DEFAULT_STOCKFISH_PARAMS: StockfishParameters = {
     "Debug Log File": "",
     Threads: 1,
     Ponder: false,
@@ -174,7 +174,7 @@ export class Stockfish {
     parameters?: Partial<StockfishParameters>;
     num_nodes?: number;
     turn_perspective?: boolean;
-  }) {
+  }): Promise<Stockfish> {
     const stockfish = new Stockfish();
     const {
       path = "stockfish",
@@ -219,7 +219,7 @@ This means that you are using an unsupported version of Stockfish.`,
   /**
    * Returns the current engine parameters being used.
    */
-  get_engine_parameters() {
+  get_engine_parameters(): StockfishParameters {
     return structuredClone(this._parameters);
   }
 
@@ -702,7 +702,7 @@ This means that you are using an unsupported version of Stockfish.`,
    *
    * @returns A string of move in algebraic notation, or `null` if it's a mate now.
    */
-  async get_best_move(options?: { wtime?: number; btime?: number }) {
+  async get_best_move(options?: { wtime?: number; btime?: number }): Promise<string | null> {
     const { wtime, btime } = { ...options };
     if (wtime !== undefined || btime !== undefined) {
       this.#go_remaining_time(wtime, btime);
@@ -735,7 +735,7 @@ This means that you are using an unsupported version of Stockfish.`,
     const last_line_split = lines.at(-1).split(/\s+/);
     // console.debug({ last_line_split });
     if (last_line_split[1] === "(none)") return null;
-    return last_line_split[1];
+    return last_line_split[1] ?? null;
   }
 
   /**
@@ -924,7 +924,10 @@ This means that you are using an unsupported version of Stockfish.`,
    * @returns "type", and the value will be either "cp" (centipawns) or "mate".
    * "value" will be an int (representing either a cp value or a mate in n value).
    */
-  async get_evaluation(searchtime?: number) {
+  async get_evaluation(searchtime?: number): Promise<{
+    type: string | undefined;
+    value: number;
+  }> {
     if (this._on_weaker_setting()) {
       this.#weaker_setting_warning(
         "get_evaluation will still return full strength Stockfish's evaluation of the position.",
