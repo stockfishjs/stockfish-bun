@@ -1,9 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-// from timeit import default_timer
-// import time
-
-import { Stockfish, Capture, Piece, StockfishError } from "~/py-stockfish";
+import { Stockfish, Capture, Piece, StockfishError } from "../dist/index.mjs";
 
 const getDefaultStockfish = () =>
   Stockfish.start({ path: process.env.STOCKFISH_PATH });
