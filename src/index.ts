@@ -36,9 +36,9 @@ export enum Capture {
 
 interface StockfishParameters {
   readonly "Debug Log File": string;
-  readonly Threads: number;
+  Threads: number;
   readonly Ponder: boolean;
-  readonly Hash: number;
+  Hash: number;
   readonly MultiPV: number;
   readonly "Skill Level": number;
   readonly "Move Overhead": number;
@@ -130,9 +130,11 @@ export class Stockfish {
   private _has_quit_command_been_sent: boolean = false;
   private _parameters: StockfishParameters = Stockfish.DEFAULT_STOCKFISH_PARAMS;
 
-  #path!: string;
-  #stockfish!: Bun.Subprocess<"pipe", "pipe", "pipe">;
-  #stdoutReader!: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
+  readonly #path: string;
+  // @ts-expect-error
+  #stockfish: Bun.Subprocess<"pipe", "pipe", "pipe">;
+  // @ts-expect-error
+  #stdoutReader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
   #lineBuffer: string = "";
 
   public static readonly DEFAULT_NUM_NODES = 1000000 as const;
@@ -146,7 +148,8 @@ export class Stockfish {
   private _depth: number = Stockfish.DEFAULT_DEPTH;
   private _turn_perspective: boolean = Stockfish.DEFAULT_TURN_PERSPECTIVE;
 
-  private _version!: {
+  // @ts-expect-error
+  #version: {
     major: number;
     minor: number;
     patch: string;
@@ -156,16 +159,18 @@ export class Stockfish {
   };
 
   /**
-   * @private Use `await Stockfish.create` instead
+   * @private Use `await Stockfish.start` instead
    */
-  private constructor() {}
+  private constructor(path: string) {
+    this.#path = path;
+  }
 
   /**
    * Initializes the Stockfish engine.
    *
    * @example ```ts
    * import { Stockfish } from "@stockfish/bun";
-   * const stockfish = await Stockfish.create();
+   * const stockfish = await Stockfish.start();
    * ```
    */
   static async start(options?: {
@@ -175,7 +180,6 @@ export class Stockfish {
     num_nodes?: number;
     turn_perspective?: boolean;
   }): Promise<Stockfish> {
-    const stockfish = new Stockfish();
     const {
       path = "stockfish",
       depth = 15,
@@ -184,7 +188,7 @@ export class Stockfish {
       turn_perspective = true,
     } = { ...options };
 
-    stockfish.#path = path;
+    const stockfish = new Stockfish(path);
 
     stockfish.#stockfish = Bun.spawn({
       cmd: [path],
@@ -241,6 +245,7 @@ This means that you are using an unsupported version of Stockfish.`,
         throw new Error(`'${key}' is not a key that exists.`);
       }
 
+      // @ts-expect-error
       this.#validate_param_value(key, new_param_values[key]);
     }
 
@@ -274,6 +279,7 @@ This means that you are using an unsupported version of Stockfish.`,
     }
 
     for (const [name, value] of Object.entries(new_param_values)) {
+      // @ts-expect-error
       await this._set_option(name, value);
     }
 
@@ -702,7 +708,10 @@ This means that you are using an unsupported version of Stockfish.`,
    *
    * @returns A string of move in algebraic notation, or `null` if it's a mate now.
    */
-  async get_best_move(options?: { wtime?: number; btime?: number }): Promise<string | null> {
+  async get_best_move(options?: {
+    wtime?: number;
+    btime?: number;
+  }): Promise<string | null> {
     const { wtime, btime } = { ...options };
     if (wtime !== undefined || btime !== undefined) {
       this.#go_remaining_time(wtime, btime);
@@ -731,7 +740,9 @@ This means that you are using an unsupported version of Stockfish.`,
   async #get_best_move_from_sf_popen_process(): Promise<string | null> {
     const lines: string[] = await this.#get_sf_go_command_output();
     // console.debug({ lines });
+    // @ts-expect-error
     this.info = lines.at(-2);
+    // @ts-expect-error
     const last_line_split = lines.at(-1).split(/\s+/);
     // console.debug({ last_line_split });
     if (last_line_split[1] === "(none)") return null;
@@ -890,9 +901,12 @@ This means that you are using an unsupported version of Stockfish.`,
     const wdl_index = split_line.indexOf("wdl");
 
     const wdl_stats = [
-      parseInt(split_line[wdl_index + 1]),
-      parseInt(split_line[wdl_index + 2]),
-      parseInt(split_line[wdl_index + 3]),
+      // @ts-expect-error
+      parseInt(split_line[wdl_index + 1], 10),
+      // @ts-expect-error
+      parseInt(split_line[wdl_index + 2], 10),
+      // @ts-expect-error
+      parseInt(split_line[wdl_index + 3], 10),
     ] as const;
 
     return wdl_stats;
@@ -957,7 +971,8 @@ This means that you are using an unsupported version of Stockfish.`,
     const score_index = split_line.indexOf("score");
     const eval_type = split_line[score_index + 1];
     const val = split_line[score_index + 2];
-    return { type: eval_type, value: parseInt(val) * compare };
+    // @ts-expect-error
+    return { type: eval_type, value: parseInt(val, 10) * compare };
   }
 
   /**
@@ -985,7 +1000,8 @@ This means that you are using an unsupported version of Stockfish.`,
         if (static_eval === "none") {
           return null;
         } else {
-          return parseFloat(static_eval) * compare;
+          // @ts-expect-error
+          return parseFloat(static_eval, 10) * compare;
         }
       }
     }
@@ -1204,14 +1220,18 @@ This means that you are using an unsupported version of Stockfish.`,
       );
     }
 
-    const file_letter: string = square[0]!.toLowerCase();
-    const rank_num: number = parseInt(square[1]!);
+    // @ts-expect-error
+    const file_letter: string = square[0].toLowerCase();
+    // @ts-expect-error
+    const rank_num: number = parseInt(square[1], 10);
 
     if (
       file_letter < "a" ||
       file_letter > "h" ||
-      square[1]! < "1" ||
-      square[1]! > "8"
+      // @ts-expect-error
+      square[1] < "1" ||
+      // @ts-expect-error
+      square[1] > "8"
     ) {
       throw new Error(
         "square argument to the get_what_is_on_square function isn't valid.",
@@ -1222,9 +1242,11 @@ This means that you are using an unsupported version of Stockfish.`,
       17 - 2 * rank_num
     ]!;
 
-    const ord = (c: string): number => [...c][0]!.codePointAt(0)!;
+    // @ts-expect-error
+    const ord = (c: string): number => [...c][0].codePointAt(0)!;
+    // @ts-expect-error
     const piece_as_char: string =
-      rank_visual[2 + (ord(file_letter) - ord("a")) * 4]!;
+      rank_visual[2 + (ord(file_letter) - ord("a")) * 4];
 
     if (piece_as_char === " ") return null;
 
@@ -1289,28 +1311,28 @@ This means that you are using an unsupported version of Stockfish.`,
    * Returns Stockfish engine major version.
    */
   get_stockfish_major_version(): number {
-    return this._version.major;
+    return this.#version.major;
   }
 
   /**
    * Returns Stockfish engine minor version.
    */
   get_stockfish_minor_version(): number {
-    return this._version.minor;
+    return this.#version.minor;
   }
 
   /**
    * Returns Stockfish engine patch version.
    */
   get_stockfish_patch_version(): string {
-    return this._version.patch;
+    return this.#version.patch;
   }
 
   /**
    * Returns Stockfish engine build version.
    */
   get_stockfish_sha_version(): string {
-    return this._version.sha;
+    return this.#version.sha;
   }
 
   /**
@@ -1319,7 +1341,7 @@ This means that you are using an unsupported version of Stockfish.`,
    * @returns `true` if the version of Stockfish being used is a development build, `false` otherwise.
    */
   is_development_build_of_engine(): boolean {
-    return this._version.is_dev_build;
+    return this.#version.is_dev_build;
   }
 
   async #set_stockfish_version(): Promise<void> {
@@ -1337,7 +1359,7 @@ This means that you are using an unsupported version of Stockfish.`,
 
   #parse_stockfish_version(version_text: string = ""): void {
     try {
-      this._version = {
+      this.#version = {
         major: 0,
         minor: 0,
         patch: "",
@@ -1346,42 +1368,42 @@ This means that you are using an unsupported version of Stockfish.`,
         text: version_text,
       };
       // check if version is a development build, eg. dev-20221219-61ea1534
-      if (this._version.text.startsWith("dev-")) {
-        this._version.is_dev_build = true;
+      if (this.#version.text.startsWith("dev-")) {
+        this.#version.is_dev_build = true;
         // parse patch and sha from dev version text
-        this._version.patch = this._version.text.split("-")[1]!;
-        this._version.sha = this._version.text.split("-")[2]!;
+        this.#version.patch = this.#version.text.split("-")[1]!;
+        this.#version.sha = this.#version.text.split("-")[2]!;
         // get major.minor version as text from build date
-        const build_date = this._version.text.split("-")[1]!;
+        const build_date = this.#version.text.split("-")[1]!;
         const date_string = `${parseInt(build_date.slice(0, 4))}-${parseInt(
           build_date.slice(4, 6),
         )}-${parseInt(build_date.slice(6, 8))}`;
-        this._version.text =
-          this._get_stockfish_version_from_build_date(date_string);
+        this.#version.text =
+          this.#get_stockfish_version_from_build_date(date_string);
       }
 
       // check if version is a development build, eg. 280322
-      if (this._version.text.length === 6) {
-        this._version.is_dev_build = true;
+      if (this.#version.text.length === 6) {
+        this.#version.is_dev_build = true;
         // parse version number from DDMMYY
-        this._version.patch = this._version.text;
+        this.#version.patch = this.#version.text;
         // parse build date from dev version text
-        const build_date = this._version.text;
+        const build_date = this.#version.text;
         const date_string = `20${build_date.slice(4, 6)}-${build_date.slice(
           2,
           4,
         )}-${build_date.slice(0, 2)}`;
-        this._version.text =
-          this._get_stockfish_version_from_build_date(date_string);
+        this.#version.text =
+          this.#get_stockfish_version_from_build_date(date_string);
       }
 
       // parse version number for all versions
-      this._version.major = parseInt(this._version.text.split(".")[0]!);
+      this.#version.major = parseInt(this.#version.text.split(".")[0]!);
 
       try {
-        this._version.minor = parseInt(this._version.text.split(".")[1]!);
+        this.#version.minor = parseInt(this.#version.text.split(".")[1]!);
       } catch {
-        this._version.minor = 0;
+        this.#version.minor = 0;
       }
     } catch (e) {
       throw new Error(
@@ -1391,9 +1413,7 @@ This means that you are using an unsupported version of Stockfish.`,
     }
   }
 
-  private _get_stockfish_version_from_build_date(
-    date_string: string = "",
-  ): string {
+  #get_stockfish_version_from_build_date(date_string: string = ""): string {
     // Convert date string to datetime object
     const date_object = new Date(date_string);
     // Convert release date strings to datetime objects

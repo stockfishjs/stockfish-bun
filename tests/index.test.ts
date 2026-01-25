@@ -76,8 +76,10 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_position(["e2e4", "e7e6"]);
     await stockfish.get_best_move();
+    // @ts-expect-error
     expect(stockfish.info).not.toBe("");
     await stockfish.set_position(["e2e4", "e7e6"]);
+    // @ts-expect-error
     expect(stockfish.info).toBe("");
     await stockfish.quit_stockfish();
   });
@@ -165,6 +167,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     await stockfish.set_fen_position("8/8/8/6pp/8/4k1PP/8/r3K3 w - - 12 53");
     expect(await stockfish.get_best_move()).toBeNull();
+    // @ts-expect-error
     expect(stockfish.info).toBe("info depth 0 score mate 0");
   });
 
@@ -173,6 +176,7 @@ describe("Stockfish", () => {
     await stockfish.set_fen_position("8/8/8/6pp/8/4k1PP/r7/4K3 b - - 11 52");
     await stockfish.get_best_move();
     await stockfish.set_fen_position("8/8/8/6pp/8/4k1PP/8/r3K3 w - - 12 53");
+    // @ts-expect-error
     expect(stockfish.info).toBe("");
     await stockfish.set_fen_position("8/8/8/6pp/8/4k1PP/r7/4K3 b - - 11 52");
     await stockfish.get_best_move();
@@ -180,6 +184,7 @@ describe("Stockfish", () => {
       "8/8/8/6pp/8/4k1PP/8/r3K3 w - - 12 53",
       false,
     );
+    // @ts-expect-error
     expect(stockfish.info).toBe("");
   });
 
@@ -189,10 +194,12 @@ describe("Stockfish", () => {
       "7r/1pr1kppb/2n1p2p/2NpP2P/5PP1/1P6/P6K/R1R2B2 w - - 1 27",
     );
     await stockfish.get_best_move();
+    // @ts-expect-error
     expect(stockfish.info).not.toBe("");
     await stockfish.set_fen_position(
       "3kn3/p5rp/1p3p2/3B4/3P1P2/2P5/1P3K2/8 w - - 0 53",
     );
+    // @ts-expect-error
     expect(stockfish.info).toBe("");
   });
 
@@ -251,6 +258,7 @@ describe("Stockfish", () => {
       "h2g1",
       "h4g3",
     ]) {
+      // @ts-expect-error
       expect(stockfish.info).toContain(value);
     }
   });
@@ -335,15 +343,18 @@ describe("Stockfish", () => {
     );
     stockfish.set_depth(13);
     await stockfish.set_elo_rating(1350);
+    // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeTrue();
     const best_moves = ["d7c6", "d7f5"] as const;
     // low_elo_moves = [stockfish.get_best_move() for _ in range(15)]
     // expect(not all(x in best_moves for x in low_elo_moves)
     await stockfish.set_skill_level(1);
+    // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeTrue();
     // low_skill_level_moves = [stockfish.get_best_move() for _ in range(15)]
     // expect(not all(x in best_moves for x in low_skill_level_moves)
     await stockfish.resume_full_strength();
+    // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeFalse();
     // full_strength_moves = [stockfish.get_best_move() for _ in range(15)]
     // expect(all(x in best_moves for x in full_strength_moves)
@@ -388,6 +399,7 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
 
     expect(Object.keys(stockfish.get_engine_parameters())).toEqual(
+      // @ts-expect-error
       expect.arrayContaining(Object.keys(Stockfish._PARAM_RESTRICTIONS)),
     );
 
@@ -407,11 +419,8 @@ describe("Stockfish", () => {
           stockfish.update_engine_parameters({ [name]: val }),
         ).rejects.toThrow(TypeError);
         expect(
-          stockfish._set_option(
-            // @ts-expect-error
-            name,
-            val,
-          ),
+          // @ts-expect-error
+          stockfish._set_option(name, val),
         ).rejects.toThrow(TypeError);
       }
     }
@@ -421,8 +430,10 @@ describe("Stockfish", () => {
     const stockfish = await getDefaultStockfish();
     expect(await stockfish.get_fen_position()).toContain("KQkq");
     const old_parameters = stockfish.get_engine_parameters();
-    const expected_parameters = stockfish.get_engine_parameters();
-    expected_parameters.UCI_Chess960 = true;
+    const expected_parameters = {
+      ...stockfish.get_engine_parameters(),
+      UCI_Chess960: true,
+    };
     await stockfish.update_engine_parameters({ UCI_Chess960: true });
     expect(await stockfish.get_fen_position()).toContain("HAha");
     expect(stockfish.get_engine_parameters()).toEqual(expected_parameters);
@@ -677,27 +688,37 @@ describe("Stockfish", () => {
     );
     await stockfish_2.get_best_move();
     await stockfish.get_best_move();
-    // expect("multipv 2" in stockfish_2.info and "depth 16" in stockfish_2.info
-    // expect("multipv 1" in stockfish.info and "depth 15" in stockfish.info
+    // @ts-expect-error
+    expect(stockfish_2.info).toContain("multipv 2");
+    // @ts-expect-error
+    expect(stockfish_2.info).toContain("depth 16");
+    // @ts-expect-error
+    expect(stockfish_2.info).toContain("multipv 1");
+    // @ts-expect-error
+    expect(stockfish_2.info).toContain("depth 15");
     expect(stockfish_2.get_depth()).toBe(16);
     expect(stockfish.get_depth()).toBe(15);
     const stockfish_1_params = stockfish.get_engine_parameters();
     const stockfish_2_params = stockfish_2.get_engine_parameters();
 
-    // for key in stockfish_2_params.keys():
-    //     if key==="MultiPV":
-    //         expect(stockfish_2_params[key]).toBe(2 and stockfish_1_params[key]).toBe(1
-    //     elif key==="UCI_Elo":
-    //         expect(stockfish_2_params[key]).toBe(2850
-    //         expect(stockfish_1_params[key]).toBe(1350
-    //     elif key==="UCI_LimitStrength":
-    //         expect(stockfish_2_params[key]).toBeTrue()
-    //         expect(stockfish_1_params[key]).toBeFalse()
-    //     elif key==="UCI_Chess960":
-    //         expect(stockfish_2_params[key]).toBeTrue()
-    //         expect(stockfish_1_params[key]).toBeFalse()
-    //     else:
-    //         expect(stockfish_2_params[key]).toBe(stockfish_1_params[key]
+    for (const key of Object.keys(stockfish_2_params)) {
+      if (key === "MultiPV") {
+        expect(stockfish_2_params[key]).toBe(2);
+        expect(stockfish_1_params[key]).toBe(1);
+      } else if (key === "UCI_Elo") {
+        expect(stockfish_2_params[key]).toBe(2850);
+        expect(stockfish_1_params[key]).toBe(1350);
+      } else if (key === "UCI_LimitStrength") {
+        expect(stockfish_2_params[key]).toBeTrue();
+        expect(stockfish_1_params[key]).toBeFalse();
+      } else if (key === "UCI_Chess960") {
+        expect(stockfish_2_params[key]).toBeTrue();
+        expect(stockfish_1_params[key]).toBeFalse();
+      } else {
+        // @ts-expect-error
+        expect(stockfish_2_params[key]).toBe(stockfish_1_params[key]);
+      }
+    }
   });
 
   it("parameters functions", async () => {
@@ -708,6 +729,7 @@ describe("Stockfish", () => {
     expect(await stockfish.get_fen_position()).toBe(
       "4rkr1/4p1p1/8/8/8/8/8/5K1R w K - 0 100",
     );
+    // @ts-expect-error
     expect(stockfish.info).toContain("multipv 1");
     await stockfish.update_engine_parameters({
       Hash: 32,
@@ -718,20 +740,17 @@ describe("Stockfish", () => {
       "4rkr1/4p1p1/8/8/8/8/8/5K1R w H - 0 100",
     );
     expect(await stockfish.get_best_move()).toBe("f1h1");
+    // @ts-expect-error
     expect(stockfish.info).toContain("multipv 2");
     const updated_parameters = stockfish.get_engine_parameters();
 
     for (const [key, value] of Object.entries(updated_parameters)) {
-      // if key == "Minimum Thinking Time":
-      //     expect(value).toBe(10
-      // elif key==="Hash":
-      //     expect(value).toBe(32
-      // elif key==="MultiPV":
-      //     expect(value).toBe(2
-      // elif key==="UCI_Chess960":
-      //     expect(value).toBeTrue()
-      // else:
-      //     expect(updated_parameters[key]).toBe(old_parameters[key]
+      if (key == "Minimum Thinking Time") expect(value).toBe(10);
+      else if (key === "Hash") expect(value).toBe(32);
+      else if (key === "MultiPV") expect(value).toBe(2);
+      else if (key === "UCI_Chess960") expect(value).toBeTrue();
+      // @ts-expect-error
+      else expect(updated_parameters[key]).toBe(old_parameters[key]);
     }
 
     expect(stockfish.get_engine_parameters().UCI_LimitStrength).toBeFalse();
@@ -763,6 +782,7 @@ describe("Stockfish", () => {
   it("get_top_moves", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
+    // @ts-expect-error
     await stockfish._set_option("MultiPV", 4);
     await stockfish.set_fen_position(
       "1rQ1r1k1/5ppp/8/8/1R6/8/2r2PPP/4R1K1 w - - 0 1",
@@ -787,6 +807,7 @@ describe("Stockfish", () => {
   it("get top moves mate", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(10);
+    // @ts-expect-error
     await stockfish._set_option("MultiPV", 3);
     await stockfish.set_fen_position("8/8/8/8/8/6k1/8/3r2K1 w - - 0 1");
     expect(await stockfish.get_top_moves()).toEqual([]);
@@ -832,6 +853,7 @@ describe("Stockfish", () => {
 
   it("get_top_moves preserve globals", async () => {
     const stockfish = await getDefaultStockfish();
+    // @ts-expect-error
     await stockfish._set_option("MultiPV", 4);
     stockfish.set_num_nodes(2000000);
     await stockfish.set_fen_position(
@@ -879,7 +901,7 @@ describe("Stockfish", () => {
     // expect(move_possibilities.keys()).toBe(move_possibilities2.keys()
     // expect(min(move_possibilities2.values())).toBe(380
     // expect(max(move_possibilities2.values())).toBe(600
-    // expect(move_possibilities2["f2f3"]).toBe(380 and move_possibilities2["e2e3"]).toBe(599
+    // expect(move_possibilities2["f2f3"]).toBe(380);expect(move_possibilities2["e2e3"]).toBe(599
   });
 
   it("get perft raises type error", async () => {
@@ -1054,6 +1076,7 @@ describe("Stockfish", () => {
   it("get wdl stats", async () => {
     const stockfish = await getDefaultStockfish();
     stockfish.set_depth(15);
+    // @ts-expect-error
     await stockfish._set_option("MultiPV", 2);
     expect(stockfish.get_wdl_stats()).not.rejects.toThrow("unsupported");
     await stockfish.set_fen_position("7k/4R3/4P1pp/7N/8/8/1q5q/3K4 w - - 0 1");
@@ -1087,12 +1110,16 @@ describe("Stockfish", () => {
     // Test multiple quit commands.
     // All of them should run without causing some Error.
     expect(stockfish.has_quit).toBeFalse();
+    // @ts-expect-error
     expect(stockfish._has_quit_command_been_sent).toBeFalse();
     await stockfish.quit_stockfish();
+    // @ts-expect-error
     expect(stockfish._has_quit_command_been_sent).toBeTrue();
     await stockfish.quit_stockfish();
+    // @ts-expect-error
     expect(stockfish._has_quit_command_been_sent).toBeTrue();
     expect(stockfish.has_quit).toBeTrue();
+    // @ts-expect-error
     expect(stockfish._has_quit_command_been_sent).toBeTrue();
   });
 
@@ -1209,6 +1236,7 @@ describe("Stockfish", () => {
   it("is fen valid", async () => {
     const stockfish = await getDefaultStockfish();
     const old_params = stockfish.get_engine_parameters();
+    // @ts-expect-error
     const old_info = stockfish.info;
     const old_depth = stockfish.get_depth();
     const old_fen = await stockfish.get_fen_position();
@@ -1256,6 +1284,7 @@ describe("Stockfish", () => {
 
     expect(stockfish.has_quit).toBeFalse();
     expect(stockfish.get_engine_parameters()).toEqual(old_params);
+    // @ts-expect-error
     expect(stockfish.info).toBe(old_info);
     expect(stockfish.get_depth()).toBe(old_depth);
     expect(await stockfish.get_fen_position()).toBe(old_fen);
