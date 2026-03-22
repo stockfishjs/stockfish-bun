@@ -316,8 +316,8 @@ This means that you are using an unsupported version of Stockfish.`,
     }
 
     if (!this._has_quit_command_been_sent) {
-      this.#stockfish.stdin.write(`${command}\n`);
-      this.#stockfish.stdin.flush();
+      void this.#stockfish.stdin.write(`${command}\n`);
+      void this.#stockfish.stdin.flush();
       if (command === "quit") {
         this._has_quit_command_been_sent = true;
       }
@@ -1048,7 +1048,7 @@ This means that you are using an unsupported version of Stockfish.`,
     // set MultiPV to num_top_moves requested
 
     if (num_top_moves !== this._parameters.MultiPV) {
-      this._set_option("MultiPV", num_top_moves);
+      await this._set_option("MultiPV", num_top_moves);
     }
 
     // start engine. will go until reaches `this._depth` or `this._num_nodes`
@@ -1149,7 +1149,7 @@ This means that you are using an unsupported version of Stockfish.`,
 
     // reset MultiPV to global value
     if (old_multipv !== this._parameters.MultiPV) {
-      this._set_option("MultiPV", old_multipv);
+      await this._set_option("MultiPV", old_multipv);
     }
 
     // reset `this._num_nodes` to global value
