@@ -345,9 +345,13 @@ describe("Stockfish", () => {
     await stockfish.set_elo_rating(1350);
     // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeTrue();
-    const best_moves = ["d7c6", "d7f5"] as const;
-    // low_elo_moves = [stockfish.get_best_move() for _ in range(15)]
-    // expect(not all(x in best_moves for x in low_elo_moves)
+    const best_moves = new Set<string | null>(["d7c6", "d7f5"]);
+    const low_elo_moves = [];
+    for (let i = 0; i < 15; i++) {
+      const move = await stockfish.get_best_move();
+      low_elo_moves.push(move);
+    }
+    expect(low_elo_moves.some((m) => !best_moves.has(m)));
     await stockfish.set_skill_level(1);
     // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeTrue();
@@ -796,7 +800,7 @@ describe("Stockfish", () => {
       { Move: "g1f1", Centipawn: null, Mate: -2 },
       { Move: "g1h1", Centipawn: null, Mate: -1 },
     ]);
-    stockfish.set_elo_rating(Stockfish.DEFAULT_STOCKFISH_PARAMS.UCI_Elo);
+    await stockfish.set_elo_rating(Stockfish.DEFAULT_STOCKFISH_PARAMS.UCI_Elo);
     const top_moves = await stockfish.get_top_moves(2);
     expect(top_moves).toEqual([
       { Move: "g1f1", Centipawn: null, Mate: -2 },
@@ -1056,7 +1060,7 @@ describe("Stockfish", () => {
       expect(chosen_move).toBeString();
       total_time_calculating_first += Date.now() - start;
       positions_considered.push(await stockfish.get_fen_position());
-      stockfish.make_moves_from_current_position([chosen_move]);
+      await stockfish.make_moves_from_current_position([chosen_move]);
     }
 
     let total_time_calculating_second = 0.0;
