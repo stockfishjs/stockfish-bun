@@ -355,8 +355,12 @@ describe("Stockfish", () => {
     await stockfish.set_skill_level(1);
     // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeTrue();
-    // low_skill_level_moves = [stockfish.get_best_move() for _ in range(15)]
-    // expect(not all(x in best_moves for x in low_skill_level_moves)
+    const low_skill_level_moves = [];
+    for (let i = 0; i < 15; i++) {
+      const move = await stockfish.get_best_move();
+      low_skill_level_moves.push(move);
+    }
+    expect(low_elo_moves.some((m) => !best_moves.has(m)));
     await stockfish.resume_full_strength();
     // @ts-expect-error
     expect(stockfish._on_weaker_setting()).toBeFalse();
@@ -852,7 +856,9 @@ describe("Stockfish", () => {
       num_nodes: 1000000,
       verbose: true,
     });
-    expect(parseInt(moves[0]?.Nodes!)).toBeGreaterThanOrEqual(1000000);
+    expect(moves.length).toBeGreaterThan(0);
+    // @ts-expect-error
+    expect(parseInt(moves[0].Nodes)).toBeGreaterThanOrEqual(1000000);
   });
 
   it("get_top_moves preserve globals", async () => {

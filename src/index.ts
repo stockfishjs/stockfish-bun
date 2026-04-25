@@ -307,10 +307,6 @@ This means that you are using an unsupported version of Stockfish.`,
   #put(command: UCICommand): void {
     // console.debug({ command });
 
-    if (!this.#stockfish.stdin) {
-      throw new BrokenPipeError();
-    }
-
     if (this.has_quit) {
       return;
     }
@@ -325,9 +321,6 @@ This means that you are using an unsupported version of Stockfish.`,
   }
 
   async #readline(): Promise<string> {
-    if (!this.#stockfish.stdout) {
-      throw new BrokenPipeError();
-    }
     if (this.has_quit) {
       throw new StockfishError("The Stockfish process has crashed", "crashed");
     }
@@ -1484,14 +1477,5 @@ export class StockfishError extends Error {
   ) {
     super(message);
     this.reason = reason;
-  }
-}
-
-class BrokenPipeError extends Error {
-  override readonly name = "BrokenPipeError";
-  readonly code = "EPIPE";
-
-  constructor(message = "Broken pipe") {
-    super(message);
   }
 }
